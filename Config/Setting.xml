@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Setting>
+	<MQTT>
+	    <BrokerIP >127.0.0.1</BrokerIP >
+	    <BrokerPort>1883</BrokerPort>
+	    <ClinetID>800</ClinetID>
+
+	    <Receive_Topic>
+	       <Name>John</Name>
+	       <Gender>Male</Gender>
+	       <TotalMarks>950</TotalMarks>
+	    </Receive_Topic>
+
+
+	    <Send_Topic>
+	       <Name>John</Name>
+	       <Gender>Male</Gender>
+	       <TotalMarks>950</TotalMarks>
+	    </Send_Topic>
+        </MQTT>
+</Setting>
