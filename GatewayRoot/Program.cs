@@ -86,7 +86,7 @@ namespace Dotnet_JOB_Client
                     //------All Management Initial -------
                     Management.ToList().ForEach(o => o.Init());
 
-                    // this is initial method iiii
+        
 
 
                     try
