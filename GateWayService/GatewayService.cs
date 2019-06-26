@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 
 
@@ -43,6 +44,9 @@ namespace GatewayService
         private System.Threading.Timer timer_heartbet;
         private bool _run = false;
 
+        private object _syncObject = new object();
+        private List<string> _Wait_Function_Config_Reply = new List<string>();
+
 
 
         public GatewayService(ILoggerFactory loggerFactory,IServiceProvider serviceProvider)
@@ -60,9 +64,7 @@ namespace GatewayService
             this._run = true;
             this._th_Proc_Flow = new Thread(new ThreadStart(Proc_Flow));
             this._th_Proc_Flow.Start();
-
             Timer_Report_HeartBet(60);
-
 
         }
 
@@ -197,6 +199,8 @@ namespace GatewayService
                 SendOutMsg.MQTTTopic = "EDCService";
                 SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(EDCReporter, Newtonsoft.Json.Formatting.Indented);
                 _QueueManager.PutMessage(SendOutMsg);
+
+               
             }
         }
 
@@ -205,6 +209,133 @@ namespace GatewayService
         public void _Update_ProcRecv_CollectData(cls_ProcRecv_CollectData obj_CollectData)
         {
             this._Update_ProcRecv_CollectData_Queue.Enqueue(obj_CollectData);
+        }
+
+        public void SendConfigAckEvent(string GateWayID, string DeviceID, string _Cmd_Result)
+        {
+            xmlMessage SendOutMsg = new xmlMessage();
+            SendOutMsg.LineID = GateWayID;     // GateID
+            SendOutMsg.DeviceID = DeviceID;   // DeviceID
+            SendOutMsg.MQTTTopic = "Config_Ack";
+            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Cmd_Result = _Cmd_Result.ToString(), Trace_ID = DateTime.Now.ToString("yyyyMMddHHmmssfff") }, Formatting.Indented);
+            _QueueManager.PutMessage(SendOutMsg);
+
+        }
+
+
+        public void Check_Wait_Function_Config_Reply(string GateWayID, string DeviceID)
+        {
+            if (this._Wait_Function_Config_Reply.Count() != 0)
+            {
+                return;
+            }
+            else
+            {
+                SendConfigAckEvent(GateWayID, DeviceID, "OK");
+              
+            }
+
+        }
+
+
+        public void ReceiveDBConfigEvent(xmlMessage InputData)
+        {
+            // / IEW / gateway / device / Cmd / Config
+            string[] Topic = InputData.MQTTTopic.Split('/');
+            string GateWayID = Topic[2].ToString();
+            string DeviceID = Topic[3].ToString();
+            string FunctionKey = "DB";
+
+            _logger.LogInformation(string.Format("GateWay Service Handle ConfigEvent GateWayID = {0}, DeviceID = {1}, Topic = {2}.", GateWayID, DeviceID, InputData.MQTTTopic));
+            _logger.LogDebug(string.Format("GateWay Service Handle ConfigEvent Topic = {0}, Payload = {1}.", InputData.MQTTTopic, InputData.MQTTPayload));
+
+            try
+            {
+                _objectmanager.DBManager_Config(GateWayID, DeviceID, InputData.MQTTPayload);
+                lock (this._syncObject)
+                {
+                    string Function_Config_key = string.Concat(GateWayID, "_", DeviceID, "_", FunctionKey);
+                    this._Wait_Function_Config_Reply.Remove(Function_Config_key);
+                }
+                Check_Wait_Function_Config_Reply(GateWayID, DeviceID);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Gateway Services Handle DB Config Event Error Message :" + ex.Message);
+                SendConfigAckEvent(GateWayID, DeviceID, "NG");
+            }
+
+        }
+
+        public void ReceiveEDCConfigEvent(xmlMessage InputData)
+        {
+            // /IEW / gateway / device / Cmd / Config / EDC / Reply
+            string[] Topic = InputData.MQTTTopic.Split('/');
+            string GateWayID = Topic[2].ToString();
+            string DeviceID = Topic[3].ToString();
+            string FunctionKey = "EDC";
+
+            _logger.LogInformation(string.Format("GateWay Service Handle ConfigEvent GateWayID = {0}, DeviceID = {1}, Topic = {2}.", GateWayID, DeviceID, InputData.MQTTTopic));
+            _logger.LogDebug(string.Format("GateWay Service Handle ConfigEvent Topic = {0}, Payload = {1}.", InputData.MQTTTopic, InputData.MQTTPayload));
+
+            try
+            {
+                _objectmanager.EDCManager_Config(GateWayID, DeviceID, InputData.MQTTPayload);
+                lock (this._syncObject)
+                {
+                    string Function_Config_key = string.Concat(GateWayID, "_", DeviceID, "_", FunctionKey);
+                    this._Wait_Function_Config_Reply.Remove(Function_Config_key);
+                }
+                Check_Wait_Function_Config_Reply(GateWayID, DeviceID);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Gateway Services Handle EDC Config Event Error Message :" + ex.Message);
+                SendConfigAckEvent(GateWayID, DeviceID, "NG");
+            }
+
+        }
+
+        public void ReceiveConfigEvent(xmlMessage InputData)
+        {
+            // / IEW / gateway / device / Cmd / Config
+            string[] Topic = InputData.MQTTTopic.Split('/');  
+            string GateWayID = Topic[2].ToString();
+            string DeviceID = Topic[3].ToString();
+
+            _logger.LogInformation(string.Format("GateWay Service Handle ConfigEvent GateWayID = {0}, DeviceID = {1}, Topic = {2}.", GateWayID, DeviceID, InputData.MQTTTopic));
+            _logger.LogDebug(string.Format("GateWay Service Handle ConfigEvent Topic = {0}, Payload = {1}.", InputData.MQTTTopic, InputData.MQTTPayload));
+
+            try
+            {
+                _objectmanager.GatewayManager_Config(GateWayID, DeviceID, InputData.MQTTPayload);
+                var gateway = _objectmanager.GatewayManager.gateway_list.Where(o => o.gateway_id.Equals(GateWayID)).FirstOrDefault();
+                if(gateway != null)
+                {
+                    foreach(string function in gateway.function_list)
+                    {
+                        xmlMessage SendOutMsg = new xmlMessage();
+                        SendOutMsg.LineID = GateWayID;     // GateID
+                        SendOutMsg.DeviceID = DeviceID;   // DeviceID
+                        SendOutMsg.MQTTTopic = string.Concat(function, "_Config_Query");
+                        SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Trace_ID = DateTime.Now.ToString("yyyyMMddHHmmssfff") }, Formatting.Indented);
+                        _QueueManager.PutMessage(SendOutMsg);
+
+                        lock (this._syncObject)
+                        {
+                            string Function_Config_key = string.Concat(GateWayID, "_", DeviceID, "_", function);
+                            this._Wait_Function_Config_Reply.Add(Function_Config_key);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Gateway Services Handle ConfigEvent Error Message :" + ex.Message);
+                SendConfigAckEvent(GateWayID, DeviceID, "NG");
+               
+
+            }
         }
 
         public void ReceiveMQTTData(xmlMessage InputData)

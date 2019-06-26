@@ -9,6 +9,7 @@ using Kernel.MQTTManager;
 using Kernel.QueueManager;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 
 namespace ObjectManager
@@ -29,9 +30,10 @@ namespace ObjectManager
         public GateWayManager GatewayManager = null;
         public TagSetManager TagSetManager = null;
         public EDCManager EDCManager = null;
+        public DBManager DBManager = null;
         public MonitorManager MonitorManager = null;
 
-
+        #region DI Defined Method of interface
         public string ManageName
         {
             get
@@ -52,23 +54,14 @@ namespace ObjectManager
 
         public void Init()
         {
-            string _config_path = @"C:\\Gateway\\Config\\Gateway_Device_Config.json";
-            if ( !LoadGatewayConfig(_config_path))
-            {
-                _logger.LogError("Config File not exist, Path = " + _config_path);
-
-            }
-
-            string _config_EDC_path = @"C:\\Gateway\\Config\\EDC_Xml_Config.json";
-            if (!LoadEDCXmlConfig(_config_EDC_path))
-            {
-                _logger.LogError("EDC File not exist, Path = " + _config_path);
-
-            }
+            GatewayManager_Initial();
+            EDCManager_Initial();
 
         }
 
+        #endregion
 
+        #region Load Local Config
         private bool LoadGatewayConfig(string config_path)
         {
             try
@@ -99,7 +92,6 @@ namespace ObjectManager
 
             return true;
         }
-
         private bool LoadEDCXmlConfig(string config_EDC_path)
         {
             try
@@ -133,10 +125,10 @@ namespace ObjectManager
 
             return true;
         }
+        #endregion
 
 
-
-        #region Gateway Constructor
+        #region Gateway Constructor / Method
         public void GatewayManager_Initial()
         {
             this.GatewayManager = new GateWayManager();
@@ -146,6 +138,41 @@ namespace ObjectManager
         {
             this.GatewayManager = JsonConvert.DeserializeObject<GateWayManager>(Json);
         }
+
+        public void GatewayManager_Config(string gatewayid, string deviceid, string Json)
+        {
+            if (this.GatewayManager == null)
+            {
+                GatewayManager_Initial();
+            }
+
+            cls_Gateway_Info tmp_gw_info = JsonConvert.DeserializeObject<cls_Gateway_Info>(Json);
+            var tmp_gateway = this.GatewayManager.gateway_list.Where(o => o.gateway_id.Equals(tmp_gw_info.gateway_id)).FirstOrDefault();
+            if(tmp_gateway != null)
+            {
+                foreach(cls_Device_Info tmp_device in tmp_gw_info.device_info)
+                {
+                    var exist = tmp_gateway.device_info.Where(o => o.device_name.Equals(tmp_device.device_name)).FirstOrDefault();
+                    if(exist == null)
+                    {
+                        tmp_gateway.device_info.Add(tmp_device);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(string.Format("gateway {0} device {1} is Exist, So Skip Update GatewayManagement", gatewayid, deviceid));
+                    }
+                  
+                }
+
+            }
+            else
+            {
+                this.GatewayManager.gateway_list.Add(tmp_gw_info);
+            }
+
+        }
+
+       
         #endregion
 
         #region Tagset Constructor
@@ -160,7 +187,7 @@ namespace ObjectManager
         }
         #endregion
 
-        #region EDCManager Constructor
+        #region EDCManager Constructor / Method
         public void EDCManager_Initial()
         {
             this.EDCManager = new EDCManager();
@@ -170,9 +197,34 @@ namespace ObjectManager
         {
             this.EDCManager = JsonConvert.DeserializeObject<EDCManager>(Json);
         }
+
+        public void EDCManager_Config(string gatewayid, string deviceid, string Json)
+        {
+            if (this.EDCManager == null)
+            {
+                EDCManager_Initial();
+            }
+
+            List<cls_EDC_Info> edc_list = JsonConvert.DeserializeObject<List<cls_EDC_Info>>(Json);
+            if (edc_list != null)
+            {
+                foreach (cls_EDC_Info edcitem in edc_list)
+                {
+
+                    var exist = this.EDCManager.gateway_edc.Where(o => o.serial_id.Equals(edcitem.serial_id)).FirstOrDefault();
+                    if (exist == null)
+                    {
+                        this.EDCManager.gateway_edc.Add(edcitem);
+
+                    }
+                }
+            }
+        }
+
         #endregion
 
         #region MonitorManager Constructor
+
         public void MonitorManager_Initial()
         {
             this.MonitorManager = new MonitorManager();
@@ -182,6 +234,7 @@ namespace ObjectManager
         {
             this.MonitorManager = JsonConvert.DeserializeObject<MonitorManager>(Json);
         }
+
         #endregion
 
         #region Gateway Method
@@ -282,6 +335,32 @@ namespace ObjectManager
         }
         #endregion
 
+        #region DBManager Constructor
+        public void DBManager_Initial()
+        {
+            this.DBManager = new DBManager();
+        }
+
+        public void DBManager_Initial(string Json)
+        {
+            this.DBManager = JsonConvert.DeserializeObject<DBManager>(Json);
+        }
+
+        public void DBManager_Config(string gatewayid, string deviceid, string Json)
+        {
+            if (this.DBManager == null)
+            {
+                DBManager_Initial();
+            }
+
+            cls_DB_Info db_info = JsonConvert.DeserializeObject<cls_DB_Info>(Json);
+            if (db_info != null)
+            {
+                this.DBManager.dbconfig_list.Add(db_info);
+            }
+        }
+
+        #endregion
 
     }
 }
