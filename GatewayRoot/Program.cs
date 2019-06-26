@@ -72,7 +72,6 @@ namespace Dotnet_JOB_Client
                     //如果是Windows Form，Application.Run()要包在using Mutex範圍內,確保WinForm執行期間Mutex一直存在
                     logger.LogInformation("Initial System...");
 
-
                     var Management = serviceProvider.GetServices<IManagement>();
                     var Services = serviceProvider.GetServices<IService>();
 
@@ -85,9 +84,6 @@ namespace Dotnet_JOB_Client
 
                     //------All Management Initial -------
                     Management.ToList().ForEach(o => o.Init());
-
-        
-
 
                     try
                     {
