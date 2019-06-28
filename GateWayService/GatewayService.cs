@@ -55,13 +55,21 @@ namespace GatewayService
 
         public void Init()
         {
-            _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
-            this._run = true;
-            this._th_Proc_Flow = new Thread(new ThreadStart(Proc_Flow));
-            this._th_Proc_Flow.Start();
+            try
+            {
+                _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
+                this._run = true;
+                this._th_Proc_Flow = new Thread(new ThreadStart(Proc_Flow));
+                this._th_Proc_Flow.Start();
+                _logger.LogTrace("EDC Service Initial Finished");
+                //Timer_Routine_Job(60000);  execute routine job 
+            }
+            catch (Exception ex)
+            {
+                Dispose();
+                _logger.LogTrace("EDC Service Initial Faild, Exception Msg = " + ex.Message);
+            }
 
-            //Timer_Routine_Job(60000);  execute routine job 
-          
         }
 
         public void Dispose()
@@ -440,7 +448,33 @@ namespace GatewayService
             this._Update_ProcRecv_CollectData_Queue.Enqueue(obj_CollectData);
         }
 
-       
+
+        public void Receive_TEXOL_MQTT(xmlMessage InputData)
+        {
+            string receive_topic = InputData.MQTTTopic;
+            if (_objectmanager.GatewayManager != null)
+            {
+                List<cls_Gateway_Info> Gateways = _objectmanager.GatewayManager.gateway_list.Where(p => p.virtual_flag==true && p.virtual_publish_topic.Equals(receive_topic)).ToList();
+                if (Gateways.Count == 0)
+                    return;
+                else
+                {
+                    foreach (cls_Gateway_Info Gateway in Gateways)
+                    {
+                        try
+                        {
+                            Proc_TEXOL_Data Function = new Proc_TEXOL_Data(Gateway, _Update_ProcRecv_CollectData);
+                            ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError("Gateway Services Handle TEXOL Data Message Error :" + ex.Message);
+
+                        }
+                    }
+                }
+            }
+        }
 
         public void ReceiveMQTTData(xmlMessage InputData)
         {
@@ -462,8 +496,8 @@ namespace GatewayService
                     {
                         try
                         {
-                            ProcCollectData Function = new ProcCollectData(Device, GateWayID, DeviceID, _Update_ProcRecv_CollectData);
-                            ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
+                             ProcCollectData Function = new ProcCollectData(Device, GateWayID, DeviceID, _Update_ProcRecv_CollectData);
+                             ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
                         }
                         catch (Exception ex)
                         {

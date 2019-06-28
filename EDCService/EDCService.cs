@@ -36,13 +36,16 @@ namespace EDCService
             }
         }
 
-
         public delegate void Put_Write_Event(string Path, string Body);
-      
+        public delegate void Handle_Interval_Event(EDCPartaker input);
 
         private ConcurrentQueue<Tuple<string, string>> _Write_EDC_File = new ConcurrentQueue<Tuple<string, string>>();
-        private bool _run = false;
+        private ConcurrentDictionary<string, EDC_Interval_Partaker> _dic_Interval_EDC = new ConcurrentDictionary<string, EDC_Interval_Partaker>();
 
+        private System.Threading.Timer timer_routine_job;
+
+
+        private bool _run = false;
         private Thread th_ReportEDC = null;
 
         // For IOC/DI Used
@@ -61,22 +64,24 @@ namespace EDCService
 
         public void Init()
         {
-            bool ret = false;
+           
             try
             {
                 _run = true;
                 this.th_ReportEDC = new Thread(new ThreadStart(EDC_Writter));
                 this.th_ReportEDC.Start();
-               // NLogManager.Logger.LogInfo(LogName, GetType().Name, MethodInfo.GetCurrentMethod().Name + "()", "Initial Finished");
-                ret = true;
+
+                Timer_Routine_Job(1000);  // Default 1s
+
+                _logger.LogTrace("EDC Service Initial Finished");
+
             }
             catch (Exception ex)
             {
-                // NLogManager.Logger.LogError(LogName, GetType().Name, MethodInfo.GetCurrentMethod().Name + "()", ex);
                 Dispose();
-                ret = false;
+                _logger.LogError("EDC Service Initial Faild, Exception Msg = " + ex.Message);
             }
-            //NLogManager.Logger.LogInfo(LogName, GetType().Name, MethodInfo.GetCurrentMethod().Name + "()", "MQTT_Service_Initial Finished");
+         
         }
 
         public void Dispose()
@@ -84,11 +89,62 @@ namespace EDCService
             _run = false;
         }
 
+        #region for Routine Job Used
+        private void Timer_Routine_Job(int interval)
+        {
+            if (interval == 0)
+                interval = 1000;  // 1s
+
+            System.Threading.Thread Thread_Timer_Report_EDC = new System.Threading.Thread
+            (
+               delegate (object value)
+               {
+                   int Interval = Convert.ToInt32(value);
+                   timer_routine_job = new System.Threading.Timer(new System.Threading.TimerCallback(Routine_TimerTask), null, 1000, Interval);
+               }
+            );
+            Thread_Timer_Report_EDC.Start(interval);
+        }
+        private void Routine_TimerTask(object timerState)
+        {
+            Check_Interval_Report_EDC();
+        }
+        #endregion
+
+        private void  Check_Interval_Report_EDC()
+        {
+            if (_dic_Interval_EDC.Count == 0)
+                return;
+            else
+            {
+                DateTime current_time = DateTime.Now;
+                foreach (KeyValuePair <string, EDC_Interval_Partaker> kvp in _dic_Interval_EDC)
+                {
+                    if(kvp.Value.Checkexpired(current_time) == false)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        EDC_Interval_Partaker proc = null;
+                        _dic_Interval_EDC.TryRemove(kvp.Key, out proc);
+
+                        string EDC_string = proc.Generate_EDC();
+                      
+                        if (EDC_string != string.Empty)
+                        {
+                            string SavePath = proc.GetEDCPath();
+                            EDC_File_Enqueue(SavePath, EDC_string);
+
+                        }
+                    }
+                }
+            }
+        }
+
         public void EDC_File_Enqueue(string SavePath, string EDC_string)
         {
-
             _Write_EDC_File.Enqueue(Tuple.Create(SavePath, EDC_string));
-           
         }
 
         private void EDC_Writter()
@@ -129,12 +185,13 @@ namespace EDCService
                             while (System.IO.File.Exists(save_file_path))
                                 Thread.Sleep(1);
                             System.IO.File.Move(temp_name, save_file_path);
-                           // NLogManager.Logger.LogInfo("Service", "EDC_Writter", MethodInfo.GetCurrentMethod().Name + "()", string.Format("Save EDC File Successful Path: {0}.", save_file_path));
 
+                            _logger.LogTrace(string.Format("Save EDC File Successful Path: {0}.", save_file_path));
+                          
                         }
                         catch (Exception ex)
                         {
-                          //  NLogManager.Logger.LogError("Service", "EDC_Writter", MethodInfo.GetCurrentMethod().Name + "()", string.Format("Write EDC File Faild Exception Msg : {0}. ", ex.Message));
+                            _logger.LogError(string.Format("Write EDC File Faild Exception Msg : {0}. ", ex.Message));
                         }
                     }
                 }
@@ -143,13 +200,21 @@ namespace EDCService
             }
         }
 
+        public void Handle_Interval_EDC (EDCPartaker input)
+        {
+              string serial_id = input.serial_id;
+              EDC_Interval_Partaker EDCInterval = _dic_Interval_EDC.GetOrAdd(serial_id, new EDC_Interval_Partaker(input));
+              EDCInterval.Add_EDC2Queue(input.edcitem_info);
+              _dic_Interval_EDC.AddOrUpdate(serial_id, EDCInterval, (key, oldvalue) => EDCInterval);
+        }
+
         public void ReceiveMQTTData(xmlMessage InputData)
         {
             // Parse Mqtt Topic
             string Topic = InputData.MQTTTopic;
             string Payload = InputData.MQTTPayload;
 
-            ProcEDCData EDCProc = new ProcEDCData(Payload, EDC_File_Enqueue);
+            ProcEDCData EDCProc = new ProcEDCData(Payload, EDC_File_Enqueue, Handle_Interval_EDC);
             if (EDCProc != null)
             {
                 ThreadPool.QueueUserWorkItem(o => EDCProc.ThreadPool_Proc());
@@ -163,17 +228,18 @@ namespace EDCService
         {
             EDCPartaker objEDC = null;
             public EDCService.Put_Write_Event _Put_Write;
-            public ProcEDCData(string inputdata, EDCService.Put_Write_Event _delegate_Method )
+            public EDCService.Handle_Interval_Event _Interval_Event;
+            public ProcEDCData(string inputdata, EDCService.Put_Write_Event _delegate_Method , EDCService.Handle_Interval_Event _delegate_Interval_Event)
             {
                 try
                 {
                     this.objEDC = JsonConvert.DeserializeObject<EDCPartaker>(inputdata.ToString());
                     _Put_Write = _delegate_Method;
+                    _Interval_Event = _delegate_Interval_Event;
                 }
                 catch (Exception ex)
                 {
                     this.objEDC = null;
-
                 }
 
             }
@@ -188,21 +254,16 @@ namespace EDCService
 
                             string EDC_string = string.Empty;
                             EDC_string = objEDC.xml_string();
-
                             if (EDC_string != string.Empty)
                             {
-
                                 string SavePath = objEDC.ReportEDCPath;
                                  _Put_Write(SavePath, EDC_string);
-                               
                             }
-
                             break;
 
                         case "interval":
-
-                            // keep interval report 需要討論要上報什麼內容 (MAX, Min, AVG or others...)
-                            break;
+                            _Interval_Event(objEDC);
+                        break;
 
                         default:
                             break;
