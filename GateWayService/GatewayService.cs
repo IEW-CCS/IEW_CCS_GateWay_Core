@@ -153,7 +153,6 @@ namespace GatewayService
             }
         }
 
-
         public void SendConfigAckEvent(string GateWayID, string DeviceID, string _Cmd_Result)
         {
             xmlMessage SendOutMsg = new xmlMessage();
@@ -164,7 +163,6 @@ namespace GatewayService
             _QueueManager.PutMessage(SendOutMsg);
 
         }
-
 
         public void Check_Wait_Function_Config_Reply(string GateWayID, string DeviceID)
         {
@@ -182,7 +180,6 @@ namespace GatewayService
             }
 
         }
-
 
         public void ReceiveDBConfigEvent(xmlMessage InputData)
         {
@@ -242,8 +239,6 @@ namespace GatewayService
 
         }
 
-        
-
         #endregion
 
 
@@ -273,7 +268,6 @@ namespace GatewayService
                 Thread.Sleep(10);
             }
         }
-
 
         public void UpdateGatewayTagInfo(cls_ProcRecv_CollectData ProcData)
         {
@@ -377,7 +371,6 @@ namespace GatewayService
             }
         }
 
-
         public void Organize_EDCPartaker(string GateWayID, string Device_ID)
         {
             //--- 等待EDC List information 
@@ -442,12 +435,10 @@ namespace GatewayService
         }
 
 
-
-        public void _Update_ProcRecv_CollectData(cls_ProcRecv_CollectData obj_CollectData)
+        public void _Update_ProcRecv_CollectData_Enqueue(cls_ProcRecv_CollectData obj_CollectData)
         {
             this._Update_ProcRecv_CollectData_Queue.Enqueue(obj_CollectData);
         }
-
 
         public void Receive_TEXOL_MQTT(xmlMessage InputData)
         {
@@ -463,7 +454,7 @@ namespace GatewayService
                     {
                         try
                         {
-                            Proc_TEXOL_Data Function = new Proc_TEXOL_Data(Gateway, _Update_ProcRecv_CollectData);
+                            Proc_TEXOL_Data Function = new Proc_TEXOL_Data(Gateway, _Update_ProcRecv_CollectData_Enqueue);
                             ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
                         }
                         catch (Exception ex)
@@ -496,7 +487,7 @@ namespace GatewayService
                     {
                         try
                         {
-                             ProcCollectData Function = new ProcCollectData(Device, GateWayID, DeviceID, _Update_ProcRecv_CollectData);
+                             ProcCollectData Function = new ProcCollectData(Device, GateWayID, DeviceID, _Update_ProcRecv_CollectData_Enqueue);
                              ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
                         }
                         catch (Exception ex)
