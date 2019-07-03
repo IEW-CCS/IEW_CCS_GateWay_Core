@@ -18,6 +18,8 @@ using Kernel.MQTTManager;
 using Kernel.Interface;
 using Kernel.QueueManager;
 using GatewayService;
+using EDCService;
+using DBService;
 
 
 namespace Dotnet_JOB_Client
@@ -41,6 +43,8 @@ namespace Dotnet_JOB_Client
                 .AddSingleton<IMQTTManager, Kernel.MQTTManager.MQTTManager>()
                 .AddSingleton<IManagement,  ObjectManager.ObjectManager>()
                 .AddSingleton<IService, GatewayService.GatewayService >()
+                .AddSingleton<IService, EDCService.EDCService>()
+                .AddSingleton<IService, DBService.DBService>()
                 .AddLogging(builder =>
                 {
                   //  builder.SetMinimumLevel(LogLevel.Trace);

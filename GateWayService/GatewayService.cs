@@ -77,6 +77,10 @@ namespace GatewayService
             _run = false;
         }
 
+        public bool ReadDateReady;
+
+       
+
 
         #region for Routine Job Used
         private void Timer_Routine_Job(int interval)
@@ -110,8 +114,11 @@ namespace GatewayService
         #region Receive Config 
         // 1. Start Receive MQTT Config 
 
+
+
         public void ReceiveConfigEvent(xmlMessage InputData)
         {
+            ReadDateReady = false;
             // / IEW / gateway / device / Cmd / Config
             string[] Topic = InputData.MQTTTopic.Split('/');
             string GateWayID = Topic[2].ToString();
@@ -394,30 +401,37 @@ namespace GatewayService
                         // Assembly Normal Tag info
                         foreach (Tuple<string, string> _Items in _EDC.tag_info)
                         {
-                            cls_EDC_Body_Item edctiem = new cls_EDC_Body_Item();
-                            edctiem.item_name = _Items.Item1;
-                            edctiem.item_type = "X";
-                            if (device.tag_info.ContainsKey(_Items.Item2))
-                                edctiem.item_value = device.tag_info[_Items.Item2].Value;
-                            else
-                                edctiem.item_value = string.Empty;
+                            cls_EDC_Body_Item edcitem = new cls_EDC_Body_Item();
+                            edcitem.item_name = _Items.Item1;
+                            edcitem.item_type = "X";
 
-                            EDCReporter.edcitem_info.Add(edctiem);
+                            if (device.tag_info.ContainsKey(_Items.Item2))
+                            {
+                                edcitem.item_value = device.tag_info[_Items.Item2].Value;
+                                edcitem.orig_item_type = device.tag_info[_Items.Item2].Expression;
+                            }
+                            else
+                                edcitem.item_value = string.Empty;
+
+                            EDCReporter.edcitem_info.Add(edcitem);
                         }
 
                         // Assembly Calc Tag info
                         foreach (Tuple<string, string> _Items in _EDC.calc_tag_info)
                         {
-                            cls_EDC_Body_Item edctiem = new cls_EDC_Body_Item();
-                            edctiem.item_name = _Items.Item1;
-                            edctiem.item_type = "X";
+                            cls_EDC_Body_Item edcitem = new cls_EDC_Body_Item();
+                            edcitem.item_name = _Items.Item1;
+                            edcitem.item_type = "X";
 
                             if (device.calc_tag_info.ContainsKey(_Items.Item2))
-                                edctiem.item_value = device.calc_tag_info[_Items.Item2].Value;
+                            {
+                                edcitem.item_value = device.calc_tag_info[_Items.Item2].Value;
+                                edcitem.orig_item_type = "DOUBLE";
+                            }
                             else
-                                edctiem.item_value = string.Empty;
+                                edcitem.item_value = string.Empty;
 
-                            EDCReporter.edcitem_info.Add(edctiem);
+                            EDCReporter.edcitem_info.Add(edcitem);
                         }
                     }
                 }
@@ -433,7 +447,6 @@ namespace GatewayService
                
             }
         }
-
 
         public void _Update_ProcRecv_CollectData_Enqueue(cls_ProcRecv_CollectData obj_CollectData)
         {
@@ -501,5 +514,12 @@ namespace GatewayService
 
         }
 
+        public void ReceiveReadDataEvent(xmlMessage InputData)
+        {
+
+            ReadDateReady = true;
+           
+
+        }
     }
 }

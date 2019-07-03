@@ -10,7 +10,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kernel", "MessageManager\Ke
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GateWayService", "GateWayService\GateWayService.csproj", "{5B45FD3D-3C78-4685-B110-5F5C99EB3EB6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EDCService", "EDCService\EDCService.csproj", "{E79EE28B-C769-47C8-A35A-0D583D3CB7DC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EDCService", "EDCService\EDCService.csproj", "{E79EE28B-C769-47C8-A35A-0D583D3CB7DC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBService", "DBService\DBService.csproj", "{1FC23C55-8B26-4A56-B9FE-3853B732F020}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,6 +40,10 @@ Global
 		{E79EE28B-C769-47C8-A35A-0D583D3CB7DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E79EE28B-C769-47C8-A35A-0D583D3CB7DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E79EE28B-C769-47C8-A35A-0D583D3CB7DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
