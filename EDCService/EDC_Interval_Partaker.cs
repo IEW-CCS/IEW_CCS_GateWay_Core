@@ -59,39 +59,52 @@ namespace EDCService
 
             foreach (cls_EDC_Body_Item key in _lst_EDC_Body_Item)
             {
-               
-                IEnumerable<cls_EDC_Body_Item> selectManyQuery = _EDCHisInfo.SelectMany(o => o.ToList());
-                List<cls_EDC_Body_Item> EDC_BodyItems = selectManyQuery.Where(o => o.item_name.Equals(key.item_name)).ToList();
-                List<double> Item1Value = EDC_BodyItems.Select(o => Convert.ToDouble(o.item_value)).ToList();
 
-                foreach (string founction in _BaseEDCInfo.interval_function)
+                if (key.orig_item_type == "ASC" || key.orig_item_type == "BIT")
                 {
 
                     cls_EDC_Body_Item EDC_Interval_Func = new cls_EDC_Body_Item();
-                    EDC_Interval_Func.item_name = string.Concat(key.item_name, "_", founction);
-                    EDC_Interval_Func.item_type = "X";
-                    switch (founction)
+                    EDC_Interval_Func.item_name = key.item_name;
+                    EDC_Interval_Func.item_type = key.item_type;
+                    EDC_Interval_Func.item_value = key.item_value;
+                    _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
+
+                }
+                else
+                {
+
+                    IEnumerable<cls_EDC_Body_Item> selectManyQuery = _EDCHisInfo.SelectMany(o => o.ToList());
+                    List<cls_EDC_Body_Item> EDC_BodyItems = selectManyQuery.Where(o => o.item_name.Equals(key.item_name)).ToList();
+                    List<double> Item1Value = EDC_BodyItems.Select(o => Convert.ToDouble(o.item_value)).ToList();
+                    foreach (string founction in _BaseEDCInfo.interval_function)
                     {
-                        case "MAX":
-                            EDC_Interval_Func.item_value = Item1Value.Max().ToString();
-                            _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
-                            break;
 
-                        case "MIN":
-                            EDC_Interval_Func.item_value = Item1Value.Min().ToString();
-                            _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
-                            break;
+                        cls_EDC_Body_Item EDC_Interval_Func = new cls_EDC_Body_Item();
+                        EDC_Interval_Func.item_name = string.Concat(key.item_name, "_", founction);
+                        EDC_Interval_Func.item_type = "X";
+                        switch (founction)
+                        {
+                            case "MAX":
+                                EDC_Interval_Func.item_value = Item1Value.Max().ToString();
+                                _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
+                                break;
 
-                        case "AVG":
-                            EDC_Interval_Func.item_value = Item1Value.Average().ToString();
-                            _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
-                            break;
+                            case "MIN":
+                                EDC_Interval_Func.item_value = Item1Value.Min().ToString();
+                                _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
+                                break;
 
-                        default:
+                            case "AVG":
+                                EDC_Interval_Func.item_value = Item1Value.Average().ToString();
+                                _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
+                                break;
 
-                            break;
+                            default:
+
+                                break;
+                        }
+
                     }
-
                 }
 
             }

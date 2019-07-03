@@ -26,6 +26,7 @@
     <Compile Remove="File.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\EDCService\EDCService.csproj" />
     <ProjectReference Include="..\GateWayService\GateWayService.csproj" />
     <ProjectReference Include="..\MessageManager\Kernel.csproj" />
     <ProjectReference Include="..\ObjectManager\ObjectManager.csproj" />

@@ -160,6 +160,7 @@ namespace Kernel.MQTTManager
             string ReturnAliasTopic = string.Empty;
             string[] tmpTopic = Topic.Split('/');
             List<string> Compare = new List<string>();
+            int IndexLimit = 0;
 
             foreach (KeyValuePair<string, string> kvp in dic_MQTT_Recv)
             {
@@ -168,7 +169,8 @@ namespace Kernel.MQTTManager
                 if (tmpSource[tmpSource.Length - 1] != "#" && tmpSource.Length < tmpTopic.Length)
                     continue;
 
-                for (int i = 0; i < tmpSource.Length; i++)
+                IndexLimit = Math.Min(tmpSource.Length, tmpTopic.Length);
+                for (int i = 0; i < IndexLimit; i++)
                 {
                     if (tmpSource[i] == "")
                         continue;

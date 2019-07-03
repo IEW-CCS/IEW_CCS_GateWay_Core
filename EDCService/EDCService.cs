@@ -134,9 +134,11 @@ namespace EDCService
 
         public void Handle_Interval_EDC (EDCPartaker input)
         {
+            
               string serial_id = input.serial_id;
+              List<cls_EDC_Body_Item> temp_EDC_Body = new List<cls_EDC_Body_Item>(input.edcitem_info.ToArray());
               EDC_Interval_Partaker EDCInterval = _dic_Interval_EDC.GetOrAdd(serial_id, new EDC_Interval_Partaker(input));
-              EDCInterval.Add_EDC2Queue(input.edcitem_info);
+              EDCInterval.Add_EDC2Queue(temp_EDC_Body);
               _dic_Interval_EDC.AddOrUpdate(serial_id, EDCInterval, (key, oldvalue) => EDCInterval);
         }
 
