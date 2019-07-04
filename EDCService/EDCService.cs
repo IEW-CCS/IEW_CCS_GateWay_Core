@@ -47,6 +47,7 @@ namespace EDCService
 
         private bool _run = false;
         private Thread th_ReportEDC = null;
+        private Thread th_Routine_Job = null;
 
         // For IOC/DI Used
         private readonly IQueueManager _QueueManager;
@@ -71,7 +72,11 @@ namespace EDCService
                 this.th_ReportEDC = new Thread(new ThreadStart(EDC_Writter));
                 this.th_ReportEDC.Start();
 
-                Timer_Routine_Job(1000);  // Default 1s
+                this.th_Routine_Job = new Thread(new ThreadStart(Routine_Job));
+                this.th_Routine_Job.Start();
+         
+
+                //Timer_Routine_Job(1000);  // Default 1s 直接使用傳統Thread 不使用time thread
 
                 _logger.LogTrace("EDC Service Initial Finished");
 
@@ -176,6 +181,15 @@ namespace EDCService
         public void EDC_File_Enqueue(string SavePath, string EDC_string)
         {
             _Write_EDC_File.Enqueue(Tuple.Create(SavePath, EDC_string));
+        }
+
+        private void Routine_Job()
+        {
+            while (_run)
+            {
+                Check_Interval_Report_EDC();
+                Thread.Sleep(100);
+            }
         }
 
         private void EDC_Writter()

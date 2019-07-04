@@ -8,6 +8,8 @@ namespace DBService.DBContext
     {
         public int id { get; set; }
 
+        public string gateway_id {get; set; }
+
         public string device_id { get; set; }
 
         public string device_desc { get; set; }

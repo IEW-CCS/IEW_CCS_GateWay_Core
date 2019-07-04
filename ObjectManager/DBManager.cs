@@ -9,6 +9,36 @@ using System.Threading.Tasks;
 namespace ObjectManager
 {
 
+    public class DBPartaker
+    {
+        public string serial_id { get; set; }
+        public string gateway_id { get; set; }
+        public string device_id { get; set; }
+        public string db_type { get; set; }
+        public bool enable { get; set; }
+        public string connection_string { get; set; }
+        public List<Tuple<string, string>> Report_Item = new List<Tuple<string, string>>();
+
+        public DBPartaker()
+        {
+
+        }
+        public DBPartaker(cls_DB_Info DB)
+        {
+            this.serial_id = DB.serial_id;
+            this.gateway_id = DB.gateway_id;
+            this.device_id = DB.device_id;
+            this.enable = DB.enable;
+            this.db_type = DB.db_type;
+            this.connection_string = DB.connection_string;
+       
+        }
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
+    }
+
     public class DBManager
     {
         public int serial_id_index;

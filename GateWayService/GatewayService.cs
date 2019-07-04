@@ -270,6 +270,10 @@ namespace GatewayService
 
                         // 結合EDC and other Information 送MQTT
                         Organize_EDCPartaker(Gateway_ID, Device_ID);
+
+                        // 結合DB Information 送MQTT
+                        Organize_DBPartaker(Gateway_ID, Device_ID);
+
                     }
                 }
                 Thread.Sleep(10);
@@ -447,6 +451,62 @@ namespace GatewayService
                
             }
         }
+
+        public void Organize_DBPartaker(string GateWayID, string Device_ID)
+        {
+            //--- Check DB List information 
+            if (_objectmanager.DBManager == null)
+                return;
+
+            List<ObjectManager.cls_DB_Info> lst_DBInfo = _objectmanager.DBManager.dbconfig_list.Where(p => p.gateway_id == GateWayID && p.device_id == Device_ID && p.enable == true).ToList();
+
+            foreach (cls_DB_Info _DB in lst_DBInfo)
+            {
+                DBPartaker DBReporter = new DBPartaker(_DB);
+                cls_Gateway_Info gateway = _objectmanager.GatewayManager.gateway_list.Where(p => p.gateway_id == GateWayID).FirstOrDefault();
+                if (gateway != null)
+                {
+                    cls_Device_Info device = gateway.device_info.Where(p => p.device_name == Device_ID).FirstOrDefault();
+                    if (device != null)
+                    {
+                        // Assembly Normal Tag info
+                        foreach (Tuple<string, string> _Items in _DB.tag_info)
+                        {
+                            string ReportItemName = _Items.Item1;
+                            string ReportItemValue = string.Empty;
+                            if (device.tag_info.ContainsKey(_Items.Item2))
+                            {
+                                ReportItemValue = device.tag_info[_Items.Item2].Value;
+                            }
+
+                            DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue)); 
+                        }
+
+                        // Assembly Calc Tag info
+                        foreach (Tuple<string, string> _Items in _DB.calc_tag_info)
+                        {
+                            string ReportItemName = _Items.Item1;
+                            string ReportItemValue = string.Empty;
+                            if (device.tag_info.ContainsKey(_Items.Item2))
+                            {
+                                ReportItemValue = device.tag_info[_Items.Item2].Value;
+                            }
+                            DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue));
+                        }
+                    }
+                }
+
+                //----- Send MQTT-----
+                xmlMessage SendOutMsg = new xmlMessage();
+                SendOutMsg.LineID = GateWayID;     // GateID
+                SendOutMsg.DeviceID = Device_ID;    // DeviceID
+                SendOutMsg.MQTTTopic = "DBService";
+                SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(DBReporter, Newtonsoft.Json.Formatting.Indented);
+                _QueueManager.PutMessage(SendOutMsg);
+
+            }
+        }
+
 
         public void _Update_ProcRecv_CollectData_Enqueue(cls_ProcRecv_CollectData obj_CollectData)
         {
