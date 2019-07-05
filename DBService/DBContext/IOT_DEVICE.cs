@@ -49,5 +49,10 @@ namespace DBService.DBContext
         public string sub_eqp_id { get; set; }
 
         public int device_no { get; set; }
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
     }
 }

@@ -184,6 +184,7 @@ namespace GatewayService
             {
                 SendConfigAckEvent(GateWayID, DeviceID, "OK");
                 this._Wait_Function_Config_Reply.TryRemove(WaitReplyQueue_Key, out removequeue);
+                _logger.LogInformation(string.Format("GateWay Service Send Config_Ack Event GateWayID = {0}, DeviceID = {1}.", GateWayID, DeviceID));
             }
 
         }
@@ -477,9 +478,10 @@ namespace GatewayService
                             if (device.tag_info.ContainsKey(_Items.Item2))
                             {
                                 ReportItemValue = device.tag_info[_Items.Item2].Value;
+                                DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue));
                             }
 
-                            DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue)); 
+                           
                         }
 
                         // Assembly Calc Tag info
@@ -490,8 +492,9 @@ namespace GatewayService
                             if (device.tag_info.ContainsKey(_Items.Item2))
                             {
                                 ReportItemValue = device.tag_info[_Items.Item2].Value;
+                                DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue));
                             }
-                            DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue));
+                           
                         }
                     }
                 }

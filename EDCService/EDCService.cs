@@ -188,7 +188,7 @@ namespace EDCService
             while (_run)
             {
                 Check_Interval_Report_EDC();
-                Thread.Sleep(100);
+                Thread.Sleep(1000);
             }
         }
 

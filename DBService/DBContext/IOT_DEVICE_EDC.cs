@@ -7,6 +7,15 @@ using System.ComponentModel.DataAnnotations;
 
 namespace DBService.DBContext
 {
+    // 擴充方法
+    public static class PropertyExtension
+    {
+        public static void SetPropertyValue(this object obj, string propName, object value)
+        {
+            obj.GetType().GetProperty(propName).SetValue(obj, value, null);
+        }
+    }
+
     public class IOT_DEVICE_EDC
     {
 
