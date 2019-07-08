@@ -37,6 +37,9 @@ namespace DBService
         private ObjectManager.ObjectManager _objectmanager = null;
         private readonly ILogger<DBService> _logger;
 
+        // ---- Base DB Partaker 
+        public ConcurrentDictionary<string, DBPartaker> _BaseDBPartaker = null;
+
         //------ Key = SerialID_Gateway_Device   Value DeviceObject
         public ConcurrentDictionary<string, DBContext.IOT_DEVICE> _IOT_Device = null;
 
@@ -54,7 +57,7 @@ namespace DBService
         public delegate List<string> Get_EDC_Label_Data_Event(string SerialID, string GatewayID, string DeviceID);
         public delegate void Update_EDC_Label_Event(string _Serial_ID, string _GateWayID, string _DeviceID, List<string> UpdateTagInfo);
         public delegate void Add_DBPartaker_to_dict_Event( DBPartaker DBP);
-
+       
         public DBService(ILoggerFactory loggerFactory, IServiceProvider serviceProvider)
         {
             _QueueManager = serviceProvider.GetService<IQueueManager>();
@@ -70,6 +73,7 @@ namespace DBService
                 _EDC_Label_Data      = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _Sync_EDC_Label_Data = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _dic_DB_Partaker     = new ConcurrentDictionary<string, List<DBPartaker>>();
+                _BaseDBPartaker      = new ConcurrentDictionary<string, DBPartaker>();
 
                 int DB_Refresh_Interval = 10000;  // 10 秒
                 int DB_Report_Interval = 6000;    // 6 秒
@@ -197,20 +201,21 @@ namespace DBService
         {
             try
             {
-               
-                foreach (cls_DB_Info DB_info in _objectmanager.DBManager.dbconfig_list)
+                // foreach (cls_DB_Info DB_info in _objectmanager.DBManager.dbconfig_list)
+
+                foreach (KeyValuePair<string, DBPartaker> BaseDBP in this._BaseDBPartaker )
                 {
-                    _logger.LogInformation(string.Format("Update_DB_Info IOT_DEVICE and EDC_LABEL Info, SerialNo = {0}, GatewayID = {1}, DeviceID = {2}", DB_info.serial_id,DB_info.gateway_id,DB_info.device_id));
-                   
+                    _logger.LogInformation(string.Format("Update_DB_Info IOT_DEVICE and EDC_LABEL Info, SerialNo = {0}, GatewayID = {1}, DeviceID = {2}", BaseDBP.Value.serial_id, BaseDBP.Value.gateway_id, BaseDBP.Value.device_id));
+
                     // "MS SQL" / "My SQL"  ""MS SQL"", "server= localhost;database=IoTDB;user=root;password=qQ123456")
-                    using (var db = new DBContext.IOT_DbContext(DB_info.db_type, DB_info.connection_string))
+                    using (var db = new DBContext.IOT_DbContext(BaseDBP.Value.db_type, BaseDBP.Value.connection_string))
                     {
                         var vIOT_Device_Result = db.IOT_DEVICE.AsQueryable();
                         var _IOT_Status = vIOT_Device_Result.ToList();
 
                         foreach (DBContext.IOT_DEVICE Device in _IOT_Status)
                         {
-                            string _IOT_Device_key = string.Concat(DB_info.serial_id, "_", Device.gateway_id, "_", Device.device_id);
+                            string _IOT_Device_key = string.Concat(BaseDBP.Value.serial_id, "_", Device.gateway_id, "_", Device.device_id);
                             DBContext.IOT_DEVICE _IOT_Device_Value = (DBContext.IOT_DEVICE)Device.Clone();
                             _IOT_Device.AddOrUpdate(_IOT_Device_key, _IOT_Device_Value, (key, oldvalue) => _IOT_Device_Value);
                         }
@@ -219,7 +224,7 @@ namespace DBService
                         foreach (DBContext.IOT_DEVICE_EDC_LABEL _EDC_Label_key in vEDC_Label_Result)
                         {
                             // Device ID  is key  use DB裡面的變數
-                            string _IOT_Device_key = string.Concat(DB_info.serial_id, "_", DB_info.gateway_id, "_", _EDC_Label_key.device_id);
+                            string _IOT_Device_key = string.Concat(BaseDBP.Value.serial_id, "_", BaseDBP.Value.gateway_id, "_", _EDC_Label_key.device_id);
                             ConcurrentDictionary<string, int> _Sub_EDC_Labels = this._EDC_Label_Data.GetOrAdd(_EDC_Label_key.device_id, new ConcurrentDictionary<string, int>());
                             _Sub_EDC_Labels.AddOrUpdate(_EDC_Label_key.data_name, _EDC_Label_key.data_index, (key, oldvalue) => _EDC_Label_key.data_index);
                             this._EDC_Label_Data.AddOrUpdate(_EDC_Label_key.device_id, _Sub_EDC_Labels, (key, oldvalue) => _Sub_EDC_Labels);
@@ -243,7 +248,10 @@ namespace DBService
                         string GatewayID = temp[2].ToString();
                         string DeviceID = temp[3].ToString();
 
-                        cls_DB_Info DB_info = _objectmanager.DBManager.dbconfig_list.Where(p => p.serial_id == SerialID).FirstOrDefault();
+
+                        DBPartaker DB_info = null;
+                        this._BaseDBPartaker.TryGetValue(SerialID, out DB_info);
+                       // cls_DB_Info DB_info = _objectmanager.DBManager.dbconfig_list.Where(p => p.serial_id == SerialID).FirstOrDefault();
 
                         if (DB_info == null)
                         {
@@ -293,6 +301,14 @@ namespace DBService
             List<DBPartaker> _Current = this._dic_DB_Partaker.GetOrAdd(Key, new List<DBPartaker>());
             _Current.Add(DBP);
             this._dic_DB_Partaker.AddOrUpdate(Key, _Current, (key, oldvalue) => _Current);
+
+            //------ Update Base DB Info ------
+
+            DBPartaker _CurrentDBPartaker = this._BaseDBPartaker.GetOrAdd(Key, new DBPartaker());
+            _CurrentDBPartaker = (DBPartaker)DBP.Clone();
+            _CurrentDBPartaker.Report_Item.Clear();
+            this._BaseDBPartaker.AddOrUpdate(Key, _CurrentDBPartaker, (key, oldvalue) => _CurrentDBPartaker);
+
         }
 
         public List<string > Get_EDC_Label_Data (string _Serial_ID, string _GateWayID, string _DeviceID)
