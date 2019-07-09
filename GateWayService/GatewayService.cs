@@ -478,7 +478,7 @@ namespace GatewayService
                             if (device.tag_info.ContainsKey(_Items.Item2))
                             {
                                 ReportItemValue = device.tag_info[_Items.Item2].Value;
-                                DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue));
+                                DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue, device.tag_info[_Items.Item2].Expression));
                             }
 
                            
@@ -492,7 +492,7 @@ namespace GatewayService
                             if (device.tag_info.ContainsKey(_Items.Item2))
                             {
                                 ReportItemValue = device.tag_info[_Items.Item2].Value;
-                                DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue));
+                                DBReporter.Report_Item.Add(Tuple.Create(ReportItemName, ReportItemValue, device.tag_info[_Items.Item2].Expression));
                             }
                            
                         }

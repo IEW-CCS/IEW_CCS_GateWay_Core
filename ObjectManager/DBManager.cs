@@ -17,7 +17,7 @@ namespace ObjectManager
         public string db_type { get; set; }
         public bool enable { get; set; }
         public string connection_string { get; set; }
-        public List<Tuple<string, string>> Report_Item = new List<Tuple<string, string>>();
+        public List<Tuple<string, string, string>> Report_Item = new List<Tuple<string,string, string>>();
 
         public DBPartaker()
         {
