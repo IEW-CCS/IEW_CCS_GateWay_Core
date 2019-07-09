@@ -121,7 +121,7 @@ namespace EDCService
             // Parse Mqtt Topic
             string Topic = InputData.MQTTTopic;
             string Payload = InputData.MQTTPayload;
-
+            _logger.LogDebug(string.Format("EDC Service Handle ReceiveMQTTData Data: {0}. ", Payload));
             try
             {
                 ProcEDCData EDCProc = new ProcEDCData(Payload, EDC_File_Enqueue, Handle_Interval_EDC);

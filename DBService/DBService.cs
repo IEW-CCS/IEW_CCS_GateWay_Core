@@ -343,6 +343,7 @@ namespace DBService
             // Parse Mqtt Topic
             string Topic = InputData.MQTTTopic;
             string Payload = InputData.MQTTPayload;
+            _logger.LogDebug(string.Format("DB Service Handle ReceiveMQTTData Data: {0}. ", Payload));
             try
             {
                 ProcDBData DBProc = new ProcDBData(Payload, Get_EDC_Label_Data, Update_EDC_Label_Data, Add_DBPartaker_to_dict);
