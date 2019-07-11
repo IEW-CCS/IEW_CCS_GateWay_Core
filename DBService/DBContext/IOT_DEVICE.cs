@@ -50,17 +50,7 @@ namespace DBService.DBContext
 
         public int device_no { get; set; }
 
-     //   public string pos_latitude { get; set; }
 
-     //   public string pos_longitude { get; set; }
-
-     //   public string plc_ip_address { get; set; }
-
-     //   public string plc_port_id { get; set; }
-
-     //   public string ble_mac { get; set; }
-
-     //   public string ble_service_uuid { get; set; }
 
         public object Clone()
         {
