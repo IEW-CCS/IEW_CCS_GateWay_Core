@@ -67,6 +67,9 @@ namespace DBService
         {
             try
             {
+
+                _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
+
                 _IOT_Device          = new ConcurrentDictionary<string, DBContext.IOT_DEVICE>();
                 _EDC_Label_Data      = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _Sync_EDC_Label_Data = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
@@ -408,7 +411,9 @@ namespace DBService
         public void Receive_Work_Recv_Event(xmlMessage InputData)
         {
             _run = true;
+            _logger.LogInformation(string.Format("Receive ReadData Event Topic : {0}, Msg : {1}. ", InputData.MQTTTopic, InputData.MQTTPayload));
             Builde_Update_DB_Information(null);
+            _logger.LogInformation("Load DB Info Finished");
 
         }
 

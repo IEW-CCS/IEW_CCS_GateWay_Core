@@ -60,7 +60,7 @@ namespace EDCService
             foreach (cls_EDC_Body_Item key in _lst_EDC_Body_Item)
             {
 
-                if (key.orig_item_type == "ASC" || key.orig_item_type == "BIT")
+                if (key.orig_item_type == "ASC" || key.orig_item_type == "BIT" )
                 {
 
                     cls_EDC_Body_Item EDC_Interval_Func = new cls_EDC_Body_Item();
@@ -69,6 +69,22 @@ namespace EDCService
                     EDC_Interval_Func.item_value = key.item_value;
                     _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
 
+                }
+                else if(key.orig_item_type == "DATETIME")
+                {
+                    DateTime parsedDate;
+                    cls_EDC_Body_Item EDC_Interval_Func = new cls_EDC_Body_Item();
+                    EDC_Interval_Func.item_name = key.item_name;
+                    EDC_Interval_Func.item_type = key.item_type;
+                    if (DateTime.TryParse(key.item_value, out parsedDate))
+                    {
+                        EDC_Interval_Func.item_value = parsedDate.ToString("yyyyMMddHHmmss");
+                    }
+                    else
+                    {
+                        EDC_Interval_Func.item_value = "999999";
+                    }
+                    _BaseEDCInfo.edcitem_info.Add(EDC_Interval_Func);
                 }
                 else
                 {
