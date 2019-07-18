@@ -12,7 +12,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GateWayService", "GateWaySe
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EDCService", "EDCService\EDCService.csproj", "{E79EE28B-C769-47C8-A35A-0D583D3CB7DC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBService", "DBService\DBService.csproj", "{1FC23C55-8B26-4A56-B9FE-3853B732F020}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DBService", "DBService\DBService.csproj", "{1FC23C55-8B26-4A56-B9FE-3853B732F020}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
