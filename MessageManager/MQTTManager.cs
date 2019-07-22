@@ -32,6 +32,8 @@ namespace Kernel.MQTTManager
         //- 1. 宣告 MQTT 實體物件 
         private  IMqttClient client = new MqttFactory().CreateMqttClient();
 
+        private Dictionary<string, string> dic_Basic_Setting = null;
+
         //--2. Setting MQTT Topic from ini setting
         private  Dictionary<string, string> dic_MQTT_Basic = null;
         private  Dictionary<string, string> dic_MQTT_Recv = null;
@@ -67,8 +69,9 @@ namespace Kernel.MQTTManager
                 {
                     foreach (KeyValuePair<string, string> kvp in dic_MQTT_Recv)
                     {
-                        _logger.LogInformation("Subscribe Topic : " + kvp.Value.ToString());
-                        await client.SubscribeAsync(new TopicFilterBuilder().WithTopic(kvp.Value.ToString()).WithAtMostOnceQoS().Build());
+                        string SubScribeTopic = kvp.Value.ToString();
+                        _logger.LogInformation("Subscribe Topic : " + SubScribeTopic);
+                        await client.SubscribeAsync(new TopicFilterBuilder().WithTopic(SubScribeTopic).WithAtMostOnceQoS().Build());
                     }
                     _logger.LogInformation("MQTT Connect / Initial successful");
                 };
@@ -124,9 +127,24 @@ namespace Kernel.MQTTManager
             XElement Receive_Topic = MQTT_Setting.Element("Receive_Topic");
             XElement Send_Topic = MQTT_Setting.Element("Send_Topic");
 
+            XElement System_Setting = SettingFromFile.Element("system");
+
+
             dic_MQTT_Basic = new Dictionary<string, string>();
             dic_MQTT_Recv = new Dictionary<string, string>();
             dic_MQTT_Send = new Dictionary<string, string>();
+
+            dic_Basic_Setting = new Dictionary<string, string>();
+
+
+            if (System_Setting != null)
+            {
+                foreach (var el in System_Setting.Elements())
+                {
+                    dic_Basic_Setting.Add(el.Name.LocalName, el.Value);
+                }
+            }
+
 
             if (Basic_Setting != null)
             {
@@ -141,7 +159,7 @@ namespace Kernel.MQTTManager
             {
                 foreach (var el in Receive_Topic.Elements())
                 {
-                    dic_MQTT_Recv.Add(el.Name.LocalName, el.Value);
+                    dic_MQTT_Recv.Add(el.Name.LocalName, el.Value.Replace("{GateWayID}", dic_Basic_Setting["GateWayID"]));
                 }
             }
 
@@ -299,7 +317,7 @@ namespace Kernel.MQTTManager
                 topic = dic_MQTT_Send[msg.MQTTTopic];
             }
 
-            return topic.Replace("{LineID}", msg.LineID).Replace("{DeviceID}", msg.DeviceID); ;
+            return topic.Replace("{GateWayID}", msg.GatewayID).Replace("{DeviceID}", msg.DeviceID); ;
         }
 
 
