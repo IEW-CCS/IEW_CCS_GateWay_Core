@@ -637,7 +637,7 @@ namespace GatewayService
             SendOutMsg.DeviceID = _dic_Basicsetting["GateWayID"]; ;   // DeviceID
             SendOutMsg.MQTTTopic = "OTA_Ack";
 
-            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Version = _Version, HBDatetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"), Status = "OTA", ProcrssID = pid }, Formatting.Indented);
+            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Version = _Version, Datetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"), Status = "OTA", ProcrssID = pid }, Formatting.Indented);
             _QueueManager.PutMessage(SendOutMsg);
 
             Thread.Sleep(5000);
