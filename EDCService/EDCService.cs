@@ -21,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ObjectManager;
 
+// add some logger for info 
 
 namespace EDCService
 {

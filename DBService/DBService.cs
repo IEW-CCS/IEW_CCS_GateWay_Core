@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using DBService.DBContext;
 
-
+// 20190723 Database 1st connected   then to do receive data actions.
 
 namespace DBService
 {
@@ -407,7 +407,7 @@ namespace DBService
             this._dic_DB_Partaker.AddOrUpdate(Key, _Current, (key, oldvalue) => _Current);  
         }
 
-        public List<string > Get_EDC_Label_Data (string _Serial_ID, string _GateWayID, string _DeviceID)
+        public List<string > Get_EDC_Label_Data(string _Serial_ID, string _GateWayID, string _DeviceID)
         {
             string _Dictkey = string.Concat(_Serial_ID, "_", _GateWayID, "_", _DeviceID);
             ConcurrentDictionary<string, int> _Sub_EDC_Labels = this._EDC_Label_Data.GetOrAdd(_Dictkey, new ConcurrentDictionary<string, int>());
