@@ -38,10 +38,12 @@ namespace DBService
 
         //------ Key = SerialID_Gateway_Device   Value DeviceObject
         public ConcurrentDictionary<string, DBContext.IOT_DEVICE> _IOT_Device = null;
+       
 
         //------ Key = SerialID_Gateway_Device    value <itemName, index>
         public  ConcurrentDictionary<string, ConcurrentDictionary<string, int>> _EDC_Label_Data = null;
         public  ConcurrentDictionary<string, ConcurrentDictionary<string, int>> _Sync_EDC_Label_Data = null;
+        public ConcurrentDictionary<string, bool> _EDC_Label_Syncing = null;
 
         private static Timer timer_refresh_database;
         private static Timer timer_report_DB;
@@ -54,7 +56,9 @@ namespace DBService
         public delegate void Update_EDC_Label_Event(string _Serial_ID, string _GateWayID, string _DeviceID, List<string> UpdateTagInfo);
         public delegate void Add_DBPartaker_to_dict_Event( DBPartaker DBP);
 
-        private bool _run = false;
+        private bool _Initial_Finished = false;
+   
+
 
         public DBService(ILoggerFactory loggerFactory, IServiceProvider serviceProvider)
         {
@@ -67,21 +71,21 @@ namespace DBService
         {
             try
             {
-
                 _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
 
                 _IOT_Device          = new ConcurrentDictionary<string, DBContext.IOT_DEVICE>();
                 _EDC_Label_Data      = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _Sync_EDC_Label_Data = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _dic_DB_Partaker     = new ConcurrentDictionary<string, ConcurrentQueue<DBPartaker>>();
-              
+                _EDC_Label_Syncing   = new ConcurrentDictionary<string, bool>();
 
-                int DB_Refresh_Interval = 60000;  // 30 秒
-                int DB_Report_Interval = 5000;    // 5 秒
+
+                int DB_Refresh_Interval = 60000;  // 60 秒
+                int DB_Report_Interval =   5000;    // 5 秒
                 Timer_Refresh_DB(DB_Refresh_Interval);
                 Timer_Report_DB(DB_Report_Interval);
 
-                _run = false; // wait system receive work recv event 
+                _Initial_Finished = false; // wait system receive work recv event 
 
             }
 
@@ -109,7 +113,7 @@ namespace DBService
                delegate (object value)
                {
                    int Interval = Convert.ToInt32(value);
-                   timer_refresh_database = new Timer(new TimerCallback(Builde_Update_DB_Information), null, 0, Interval);
+                   timer_refresh_database = new Timer(new TimerCallback(Routine_Update_DB_Information), null, 0, Interval);
 
                }
             );
@@ -136,9 +140,6 @@ namespace DBService
         #region Time Thread Method 
         public void DB_TimerTask(object timerState)
         {
-            if (_run == false)
-                return;
-
             try
             {
                 foreach( var key in _dic_DB_Partaker.Keys)
@@ -221,10 +222,90 @@ namespace DBService
                 _logger.LogError(string.Format("Insert_DB Faild ex :{0}. ", ex.Message));
             }
         }
-        public void Builde_Update_DB_Information(object timerState)
+
+        public void _First_Initial_DB_Information()
+        {
+            try
+            {
+                foreach (cls_DB_Info DB_info in _objectmanager.DBManager.dbconfig_list)
+                {
+                    _logger.LogInformation(string.Format("Initial_DB_Info IOT_DEVICE and EDC_LABEL Info, SerialNo = {0}, GatewayID = {1}, DeviceID = {2}", DB_info.serial_id, DB_info.gateway_id, DB_info.device_id));
+                    string _IOT_Device_key = string.Empty;
+
+                    // "MS SQL" / "My SQL"  ""MS SQL"", "server= localhost;database=IoTDB;user=root;password=qQ123456")
+                    using (var db = new DBContext.IOT_DbContext(DB_info.db_type, DB_info.connection_string))
+                    {
+                        var _IOT_Status = db.IOT_DEVICE.AsQueryable().Where(p => p.gateway_id == DB_info.gateway_id && p.device_id == DB_info.device_id).ToList();
+                        foreach (DBContext.IOT_DEVICE Device in _IOT_Status)
+                        {
+                            _IOT_Device_key = string.Concat(DB_info.serial_id, "_", DB_info.gateway_id, "_", DB_info.device_id);
+                            DBContext.IOT_DEVICE _IOT_Device_Value = (DBContext.IOT_DEVICE)Device.Clone();
+                            this._IOT_Device.AddOrUpdate(_IOT_Device_key, _IOT_Device_Value, (key, oldvalue) => _IOT_Device_Value);
+                        }
+
+                        // 更新EDC Label 
+                        var vEDC_Label_Result = db.IOT_DEVICE_EDC_LABEL.AsQueryable().Where(o => o.device_id == DB_info.device_id).ToList();
+                        _IOT_Device_key = string.Concat(DB_info.serial_id, "_", DB_info.gateway_id, "_", DB_info.device_id);
+                        ConcurrentDictionary<string, int> _Sub_EDC_Labels = this._EDC_Label_Data.GetOrAdd(DB_info.device_id, new ConcurrentDictionary<string, int>());
+                        foreach (DBContext.IOT_DEVICE_EDC_LABEL _EDC_Label_key in vEDC_Label_Result)
+                        {
+                            _Sub_EDC_Labels.AddOrUpdate(_EDC_Label_key.data_name, _EDC_Label_key.data_index, (key, oldvalue) => _EDC_Label_key.data_index);
+                        }
+                        this._EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sub_EDC_Labels, (key, oldvalue) => _Sub_EDC_Labels);
+
+                    
+                        //------  更新完DB 資料，接著比對DB Config - DB資料
+                        List<string> ConfigSetting_NormalTag = DB_info.tag_info.Select(o => o.Item1).ToList();
+                        List<string> ConfigSetting_CalcTag = DB_info.calc_tag_info.Select(o => o.Item1).ToList();
+                        List<string> ConfigSetting_Tag = ConfigSetting_NormalTag.Concat(ConfigSetting_CalcTag).ToList();
+
+                        ConcurrentDictionary<string, int> _DB_EDC_Labels = this._EDC_Label_Data.GetOrAdd(DB_info.device_id, new ConcurrentDictionary<string, int>());
+                        List<string> DBSetting_Tag = _DB_EDC_Labels.Keys.ToList();
+
+                        List<string> Diff = ConfigSetting_Tag.Except(DBSetting_Tag).ToList();
+
+                        if (Diff.Count > 0)
+                        {
+                            ConcurrentDictionary<string, int> _Sync_Device_EDC_Label = this._Sync_EDC_Label_Data.GetOrAdd(_IOT_Device_key, new ConcurrentDictionary<string, int>());
+                            List<int> _lstIndex = _DB_EDC_Labels.Select(t => t.Value).ToList();
+
+                            //---- 找出最大值 --
+                            int _CurrentIndex = 0;
+                            if (_lstIndex.Count() == 0)
+                            {
+                                _CurrentIndex = 0;
+                            }
+                            else
+                            {
+                                _CurrentIndex = _lstIndex.Max();
+                            }
+
+                            foreach (string New_EDC_items in Diff)
+                            {
+                                _CurrentIndex++;
+                                _DB_EDC_Labels.AddOrUpdate(New_EDC_items, _CurrentIndex, (key, oldvalue) => _CurrentIndex);
+                                _Sync_Device_EDC_Label.AddOrUpdate(New_EDC_items, _CurrentIndex, (key, oldvalue) => _CurrentIndex);
+                            }
+                            this._EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _DB_EDC_Labels, (key, oldvalue) => _DB_EDC_Labels);
+                            this._Sync_EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sync_Device_EDC_Label, (key, oldvalue) => _Sync_Device_EDC_Label);
+                        }
+
+                    }
+
+                }
+            }
+
+            catch (Exception ex)
+            {
+                _logger.LogError("First_Initial_DB_Information, error :" + ex.Message);
+            }
+
+        }
+
+        public void Routine_Update_DB_Information(object timerState)
         {
 
-            if (_run == false)
+            if (_Initial_Finished == false)
                 return;
 
             try
@@ -307,7 +388,7 @@ namespace DBService
 
             catch (Exception ex)
             {
-                _logger.LogError("Builde_Update_DB_Information, error :" + ex.Message);
+                _logger.LogError("Routine_Update_DB_Information, error :" + ex.Message);
             }
 
         }
@@ -317,6 +398,9 @@ namespace DBService
 
         public void Add_DBPartaker_to_dict( DBPartaker DBP )
         {
+            if(_Initial_Finished == false)
+               return;
+
             string Key = string.Concat(DBP.db_type, "_", DBP.connection_string);
             ConcurrentQueue<DBPartaker> _Current = this._dic_DB_Partaker.GetOrAdd(Key, new ConcurrentQueue<DBPartaker>());
             _Current.Enqueue(DBP);
@@ -352,50 +436,20 @@ namespace DBService
             return _Sub_EDC_Labels.Keys.ToList();
         }
 
-        public void Update_EDC_Label_Data(string _Serial_ID, string _GateWayID, string _DeviceID, List<string> UpdateTagInfo)
-        {
 
-            string _IOT_Device_key = string.Concat(_Serial_ID, "_", _GateWayID, "_", _DeviceID);
-            ConcurrentDictionary<string, int> _Sub_EDC_Label = this._EDC_Label_Data.GetOrAdd(_IOT_Device_key, new ConcurrentDictionary<string, int>());
-            ConcurrentDictionary<string, int> _Sync_Device_EDC_Label = this._Sync_EDC_Label_Data.GetOrAdd(_IOT_Device_key, new ConcurrentDictionary<string, int>());
-
-            List<int> _lstIndex = _Sub_EDC_Label.Select(t => t.Value).ToList();
-
-            //---- 找出最大值 --
-            int _CurrentIndex = 0;
-            if (_lstIndex.Count() == 0)
-                _CurrentIndex = 0;
-            else
-                _CurrentIndex = _lstIndex.Max();
-
-            foreach (string New_EDC_items in UpdateTagInfo)
-            {
-                _CurrentIndex++;
-                _Sub_EDC_Label.AddOrUpdate(New_EDC_items, _CurrentIndex, (key, oldvalue) => _CurrentIndex);
-                _Sync_Device_EDC_Label.AddOrUpdate(New_EDC_items, _CurrentIndex, (key, oldvalue) => _CurrentIndex);
-            }
-            this._EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sub_EDC_Label, (key, oldvalue) => _Sub_EDC_Label);
-            this._Sync_EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sync_Device_EDC_Label, (key, oldvalue) => _Sync_Device_EDC_Label);
-
-            Builde_Update_DB_Information(null);
-        }
 
         #endregion
 
 
         public void ReceiveMQTTData(xmlMessage InputData)
         {
-
-            if (_run == false)
-                return;
-
             // Parse Mqtt Topic
             string Topic = InputData.MQTTTopic;
             string Payload = InputData.MQTTPayload;
             _logger.LogDebug(string.Format("DB Service Handle ReceiveMQTTData Data: {0}. ", Payload));
             try
             {
-                ProcDBData DBProc = new ProcDBData(Payload, Get_EDC_Label_Data, Update_EDC_Label_Data, Add_DBPartaker_to_dict);
+                ProcDBData DBProc = new ProcDBData(Payload,  Add_DBPartaker_to_dict);
                 if (DBProc != null)
                 {
                     ThreadPool.QueueUserWorkItem(o => DBProc.ThreadPool_Proc());
@@ -410,10 +464,13 @@ namespace DBService
 
         public void Receive_Work_Recv_Event(xmlMessage InputData)
         {
-            _run = true;
+            
             _logger.LogInformation(string.Format("Receive ReadData Event Topic : {0}, Msg : {1}. ", InputData.MQTTTopic, InputData.MQTTPayload));
-            Builde_Update_DB_Information(null);
-            _logger.LogInformation("Load DB Info Finished");
+            _logger.LogInformation("First Load DB Info Start");
+            _First_Initial_DB_Information();
+            _logger.LogInformation("First Load DB Info Finished");
+            _Initial_Finished = true;
+
 
         }
 
@@ -436,16 +493,12 @@ namespace DBService
     public class ProcDBData
     {
         DBPartaker objDB = null;
-        public DBService.Get_EDC_Label_Data_Event _GetEDCLabel;
-        public DBService.Update_EDC_Label_Event _UpdateEDCLabel;
         public DBService.Add_DBPartaker_to_dict_Event _Add_DBPartakertoDict;
-        public ProcDBData(string inputdata, DBService.Get_EDC_Label_Data_Event GetEDCLabel, DBService.Update_EDC_Label_Event UpdateEDCLabel, DBService.Add_DBPartaker_to_dict_Event Add_DBPartakertoDict)
+        public ProcDBData(string inputdata,  DBService.Add_DBPartaker_to_dict_Event Add_DBPartakertoDict)
         {
             try
             {
                 this.objDB = JsonConvert.DeserializeObject<DBPartaker>(inputdata.ToString());
-                _GetEDCLabel = GetEDCLabel;
-                _UpdateEDCLabel = UpdateEDCLabel;
                 _Add_DBPartakertoDict = Add_DBPartakertoDict;
             }
             catch
@@ -456,17 +509,7 @@ namespace DBService
         }
         public void ThreadPool_Proc()
         {
-            List<string> EDCLabel = _GetEDCLabel(objDB.serial_id, objDB.gateway_id, objDB.device_id);
-            List<string> ReporLabel = this.objDB.Report_Item.Select(t => t.Item1).ToList();
-            List<string> Diff = ReporLabel.Except(EDCLabel).ToList();
-
-            if(Diff.Count > 0)
-            {
-                _UpdateEDCLabel(this.objDB.serial_id, this.objDB.gateway_id, this.objDB.device_id, Diff);
-            }
-
             _Add_DBPartakertoDict(this.objDB);
-
         }
     }
 }

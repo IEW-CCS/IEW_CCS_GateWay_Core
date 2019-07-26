@@ -78,7 +78,7 @@ namespace EDCService
 
                 //Timer_Routine_Job(1000);  // Default 1s 直接使用傳統Thread 不使用time thread
 
-                _logger.LogTrace("EDC Service Initial Finished");
+                _logger.LogInformation("EDC Service Initial Finished");
 
             }
             catch (Exception ex)
@@ -204,8 +204,6 @@ namespace EDCService
 
                         string Timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff");
                         string save_file_path = _msg.Item1.Replace("{datetime}", Timestamp);
-
-
                         string EDC_Data = _msg.Item2;
 
                         try
@@ -213,6 +211,7 @@ namespace EDCService
                             if (!Directory.Exists(Path.GetDirectoryName(save_file_path)))
                             {
                                 Directory.CreateDirectory(Path.GetDirectoryName(save_file_path));
+                                _logger.LogWarning(string.Format("Save EDC Path {0}  Directory Not Exist, Create Directory.", save_file_path));
                             }
                             string temp_name = save_file_path + ".tmp";
                             using (FileStream fs = System.IO.File.Open(temp_name, FileMode.Create))
@@ -231,7 +230,7 @@ namespace EDCService
                                 Thread.Sleep(1);
                             System.IO.File.Move(temp_name, save_file_path);
 
-                            _logger.LogTrace(string.Format("Save EDC File Successful Path: {0}.", save_file_path));
+                            _logger.LogInformation(string.Format("Save EDC File Successful Path: {0}.", save_file_path));
 
                         }
                         catch (Exception ex)

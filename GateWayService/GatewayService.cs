@@ -54,6 +54,8 @@ namespace GatewayService
 
         private string _Version = "1.0.0";
 
+        private const string _GatewayID = "GatewayID";
+
 
         public GatewayService(ILoggerFactory loggerFactory,IServiceProvider serviceProvider)
         {
@@ -68,7 +70,7 @@ namespace GatewayService
             {
                 _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
 
-                string Config_Path = AppContext.BaseDirectory + "/settings/Setting.xml";
+                string Config_Path = AppContext.BaseDirectory + "/settings/System.xml";
                 Load_Xml_Config_To_Dict(Config_Path);
 
 
@@ -79,7 +81,8 @@ namespace GatewayService
 
                 GateWayStatus = "Init";
 
-                Timer_Routine_Job(60000);  //execute routine job 
+
+                Timer_Routine_Job(_dic_Basicsetting["HeartBeat_Interval"]);  //execute routine job 
             }
             catch (Exception ex)
             {
@@ -112,10 +115,21 @@ namespace GatewayService
 
 
         #region for Routine Job Used
-        private void Timer_Routine_Job(int interval)
+        private void Timer_Routine_Job(string interval)
         {
-            if (interval == 0)
-                interval = 10000;  // 10s
+            int reportInterval = 10000;
+            int temp = 0;
+
+            if (Int32.TryParse(interval, out temp))
+            {
+
+                reportInterval = temp * 1000;
+            }
+            else
+            {
+                reportInterval = 10000;
+            }
+
 
             System.Threading.Thread Thread_Timer_Report_EDC = new System.Threading.Thread
             (
@@ -125,15 +139,15 @@ namespace GatewayService
                    timer_routine_job = new System.Threading.Timer(new System.Threading.TimerCallback(Routine_TimerTask), null, 1000, Interval);
                }
             );
-            Thread_Timer_Report_EDC.Start(interval);
+            Thread_Timer_Report_EDC.Start(reportInterval);
         }
         private void Routine_TimerTask(object timerState)
         {
             try
             {
                 xmlMessage SendOutMsg = new xmlMessage();
-                SendOutMsg.GatewayID = _dic_Basicsetting["GateWayID"];     // GateID
-                SendOutMsg.DeviceID = _dic_Basicsetting["GateWayID"];
+                SendOutMsg.GatewayID = _dic_Basicsetting[_GatewayID];     // GateID
+                SendOutMsg.DeviceID = _dic_Basicsetting[_GatewayID];
                 SendOutMsg.MQTTTopic = "HeartBeat";
                 SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Trace_ID = DateTime.Now.ToString("yyyyMMddHHmmssfff"),Status = GateWayStatus }, Formatting.Indented);
                 _QueueManager.PutMessage(SendOutMsg);
@@ -633,12 +647,14 @@ namespace GatewayService
             string pid = currentProcess.Id.ToString();
 
             xmlMessage SendOutMsg = new xmlMessage();
-            SendOutMsg.GatewayID = _dic_Basicsetting["GateWayID"]; ;     // GateID
-            SendOutMsg.DeviceID = _dic_Basicsetting["GateWayID"]; ;   // DeviceID
+            SendOutMsg.GatewayID = _dic_Basicsetting[_GatewayID]; ;     // GateID
+            SendOutMsg.DeviceID = _dic_Basicsetting[_GatewayID]; ;   // DeviceID
             SendOutMsg.MQTTTopic = "OTA_Ack";
 
             SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Version = _Version, HBDatetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"), Status = "OTA", ProcrssID = pid }, Formatting.Indented);
             _QueueManager.PutMessage(SendOutMsg);
+
+            _logger.LogError("Gateway Services Handle OTA Process System Will be shutdown in 5 seconds.");
 
             Thread.Sleep(5000);
 
