@@ -20,6 +20,7 @@ using Newtonsoft.Json.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ObjectManager;
+using System.Xml.Linq;
 
 // add some logger for info 
 
@@ -36,6 +37,10 @@ namespace EDCService
                 return this._SeviceName;
             }
         }
+
+        private const string _GatewayID = "GatewayID";
+        private const string _DeviceID = "DeviceID";
+
 
         public delegate void Put_Write_Event(string Path, string Body);
         public delegate void Handle_Interval_Event(EDCPartaker input);
@@ -56,6 +61,9 @@ namespace EDCService
         private ObjectManager.ObjectManager _objectmanager = null;
         private readonly ILogger<EDCService> _logger;
 
+        // -- read config .ini
+        private Dictionary<string, string> _dic_Basicsetting = new Dictionary<string, string>();
+
 
         public EDCService(ILoggerFactory loggerFactory, IServiceProvider serviceProvider)
         {
@@ -70,6 +78,11 @@ namespace EDCService
             try
             {
                 _run = true;
+
+                string Config_Path = AppContext.BaseDirectory + "/settings/System.xml";
+                Load_Xml_Config_To_Dict(Config_Path);
+
+
                 this.th_ReportEDC = new Thread(new ThreadStart(EDC_Writter));
                 this.th_ReportEDC.Start();
 
@@ -133,7 +146,9 @@ namespace EDCService
             }
             catch (Exception ex)
             {
-                _logger.LogError(string.Format("EDC Service Handle ReceiveMQTTData Exception Msg : {0}. ", ex.Message));
+                string ErrorLog = string.Format("EDC Service Handle ReceiveMQTTData Exception Msg : {0}. ", ex.Message);
+                _logger.LogError(ErrorLog);
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0001", ErrorLog, "ERROR");
             }
 
         }
@@ -236,7 +251,11 @@ namespace EDCService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(string.Format("Write EDC File Faild Exception Msg : {0}. ", ex.Message));
+
+                            string ErrorLog = string.Format("Write EDC File Faild Exception Msg : {0}. ", ex.Message);
+                            _logger.LogError(ErrorLog);
+                            ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0002", ErrorLog, "ERROR");
+
                         }
                     }
                 }
@@ -244,6 +263,42 @@ namespace EDCService
                 Thread.Sleep(10);
             }
         }
+
+        public void ReportAlarm(string gateway_id, string device_id, string al_code, string al_desc, string al_level)
+        {
+            xmlMessage SendOutMsg = new xmlMessage();
+            SendOutMsg.GatewayID = gateway_id;     // GateID
+            SendOutMsg.DeviceID = device_id;   // DeviceID
+            SendOutMsg.MQTTTopic = "IOT_Alarm";
+
+            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new
+            {
+                AlarmCode = al_code,
+                Datetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"),
+                AlarmLevel = al_level,
+                AlarmApp = "IOTCLIENT",
+                AlarmDesc = al_desc
+
+            }, Newtonsoft.Json.Formatting.Indented);
+            _QueueManager.PutMessage(SendOutMsg);
+        }
+
+        private void Load_Xml_Config_To_Dict(string config_path)
+        {
+            XElement SettingFromFile = XElement.Load(config_path);
+            XElement System_Setting = SettingFromFile.Element("system");
+
+            _dic_Basicsetting.Clear();
+
+            if (System_Setting != null)
+            {
+                foreach (var el in System_Setting.Elements())
+                {
+                    _dic_Basicsetting.Add(el.Name.LocalName, el.Value);
+                }
+            }
+        }
+
 
     }
 

@@ -359,7 +359,7 @@ namespace Kernel.MQTTManager
                 topic = dic_MQTT_Send[msg.MQTTTopic];
             }
 
-            return topic.Replace("{GateWayID}", msg.GatewayID).Replace("{DeviceID}", msg.DeviceID); ;
+            return topic.Replace("{GatewayID}", msg.GatewayID).Replace("{DeviceID}", msg.DeviceID); ;
         }
 
 

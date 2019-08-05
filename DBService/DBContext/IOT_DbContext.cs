@@ -34,7 +34,9 @@ namespace DBService.DBContext
 
         // Constructor 
         public IOT_DbContext(string provider, string connectstring) : base(CreateDbConnection(provider, connectstring))
-        {  
+        {
+            base.ChangeTracker.AutoDetectChangesEnabled = false;
+            base.ChangeTracker.LazyLoadingEnabled = false;
         }
 
         public DbSet<IOT_DEVICE> IOT_DEVICE { get; set; }

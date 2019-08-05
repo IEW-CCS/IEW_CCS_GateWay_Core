@@ -14,6 +14,9 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using DBService.DBContext;
+using System.Diagnostics;
+using System.Xml.Linq;
+
 
 // 20190723 Database 1st connected   then to do receive data actions.
 
@@ -30,6 +33,10 @@ namespace DBService
             }
         }
 
+
+        private const string _GatewayID = "GatewayID"; 
+        private const string _DeviceID = "DeviceID";
+
         // For IOC/DI Used
         private readonly IQueueManager _QueueManager;
         private readonly IManagement _ObjectManager;
@@ -37,13 +44,11 @@ namespace DBService
         private readonly ILogger<DBService> _logger;
 
         //------ Key = SerialID_Gateway_Device   Value DeviceObject
-        public ConcurrentDictionary<string, DBContext.IOT_DEVICE> _IOT_Device = null;
+        public  ConcurrentDictionary<string, DBContext.IOT_DEVICE> _IOT_Device = null;
        
-
         //------ Key = SerialID_Gateway_Device    value <itemName, index>
         public  ConcurrentDictionary<string, ConcurrentDictionary<string, int>> _EDC_Label_Data = null;
         public  ConcurrentDictionary<string, ConcurrentDictionary<string, int>> _Sync_EDC_Label_Data = null;
-        public ConcurrentDictionary<string, bool> _EDC_Label_Syncing = null;
 
         private static Timer timer_refresh_database;
         private static Timer timer_report_DB;
@@ -52,9 +57,11 @@ namespace DBService
         private ConcurrentDictionary<string, ConcurrentQueue<DBPartaker>> _dic_DB_Partaker =  null;
 
         // -- Delegate Method
-        public delegate List<string> Get_EDC_Label_Data_Event(string SerialID, string GatewayID, string DeviceID);
-        public delegate void Update_EDC_Label_Event(string _Serial_ID, string _GateWayID, string _DeviceID, List<string> UpdateTagInfo);
         public delegate void Add_DBPartaker_to_dict_Event( DBPartaker DBP);
+
+        // -- read config .ini
+        private Dictionary<string, string> _dic_Basicsetting = new Dictionary<string, string>();
+
 
         private bool _Initial_Finished = false;
    
@@ -71,30 +78,39 @@ namespace DBService
         {
             try
             {
+
+                string Config_Path = AppContext.BaseDirectory + "/settings/System.xml";
+                Load_Xml_Config_To_Dict(Config_Path);
+
                 _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
 
                 _IOT_Device          = new ConcurrentDictionary<string, DBContext.IOT_DEVICE>();
                 _EDC_Label_Data      = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _Sync_EDC_Label_Data = new ConcurrentDictionary<string, ConcurrentDictionary<string, int>>();
                 _dic_DB_Partaker     = new ConcurrentDictionary<string, ConcurrentQueue<DBPartaker>>();
-                _EDC_Label_Syncing   = new ConcurrentDictionary<string, bool>();
-
 
                 int DB_Refresh_Interval = 60000;  // 60 秒
                 int DB_Report_Interval =   5000;    // 5 秒
-                Timer_Refresh_DB(DB_Refresh_Interval);
-                Timer_Report_DB(DB_Report_Interval);
+                Timer_Refresh_DB(DB_Refresh_Interval);  //定時Refresh DB Information to local
+                Timer_Report_DB(DB_Report_Interval);    //定時Report Data to DB 
 
-                _Initial_Finished = false; // wait system receive work recv event 
+                _Initial_Finished = false; // 等待IOT Client 與 CCS 完成通訊以後才開始動作
+
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0000", "this is testing", "ERROR");
+
 
             }
 
             catch (Exception ex)
             {
                 Dispose();
-                 _logger.LogError("DB Service Initial Faild, Exception Msg = " + ex.Message);
+                string ErrorLog = "DB Service Initial Faild, Exception Msg = " + ex.Message;
+                 _logger.LogError(ErrorLog);
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0001", ErrorLog, "ERROR");
+
+
             }
-         }
+        }
 
         public void Dispose()
         {
@@ -138,6 +154,7 @@ namespace DBService
         #endregion
 
         #region Time Thread Method 
+        // Real Insert DB 的部分
         public void DB_TimerTask(object timerState)
         {
             try
@@ -154,6 +171,11 @@ namespace DBService
                     if (_DBProcess.Count > 0)
                     {
                         DBPartaker DBP = null;
+
+                        Stopwatch stopwatch = new Stopwatch();
+                        stopwatch.Start();
+                        int _DBProcess_Deep = _DBProcess.Count();
+
                         using (var db = new DBContext.IOT_DbContext(Provider, ConnectionStr))
                         {
                             while (_DBProcess.TryDequeue(out DBP))
@@ -214,12 +236,18 @@ namespace DBService
                                 }
                             }
                         }
+
+                        stopwatch.Stop();
+                        _logger.LogInformation(string.Format("Execute Update DB Key {0} DataCount : {1}, Spect Time {2} ms > " , key, _DBProcess_Deep, stopwatch.ElapsedMilliseconds));
                     }  
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(string.Format("Insert_DB Faild ex :{0}. ", ex.Message));
+                string ErrorLog = string.Format("Insert_DB Faild ex :{0}. ", ex.Message);
+                _logger.LogError(ErrorLog);
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0001", ErrorLog, "ERROR");
+
             }
         }
 
@@ -235,6 +263,7 @@ namespace DBService
                     // "MS SQL" / "My SQL"  ""MS SQL"", "server= localhost;database=IoTDB;user=root;password=qQ123456")
                     using (var db = new DBContext.IOT_DbContext(DB_info.db_type, DB_info.connection_string))
                     {
+                        // 建置更新 IOT Device Information 
                         var _IOT_Status = db.IOT_DEVICE.AsQueryable().Where(p => p.gateway_id == DB_info.gateway_id && p.device_id == DB_info.device_id).ToList();
                         foreach (DBContext.IOT_DEVICE Device in _IOT_Status)
                         {
@@ -243,7 +272,7 @@ namespace DBService
                             this._IOT_Device.AddOrUpdate(_IOT_Device_key, _IOT_Device_Value, (key, oldvalue) => _IOT_Device_Value);
                         }
 
-                        // 更新EDC Label 
+                        // 建置更新 EDC Label to Local  (DB)
                         var vEDC_Label_Result = db.IOT_DEVICE_EDC_LABEL.AsQueryable().Where(o => o.device_id == DB_info.device_id).ToList();
                         _IOT_Device_key = string.Concat(DB_info.serial_id, "_", DB_info.gateway_id, "_", DB_info.device_id);
                         ConcurrentDictionary<string, int> _Sub_EDC_Labels = this._EDC_Label_Data.GetOrAdd(DB_info.device_id, new ConcurrentDictionary<string, int>());
@@ -254,10 +283,11 @@ namespace DBService
                         this._EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sub_EDC_Labels, (key, oldvalue) => _Sub_EDC_Labels);
 
                     
-                        //------  更新完DB 資料，接著比對DB Config - DB資料
+                        // 建置 CCS Config 設定資料
                         List<string> ConfigSetting_NormalTag = DB_info.tag_info.Select(o => o.Item1).ToList();
                         List<string> ConfigSetting_CalcTag = DB_info.calc_tag_info.Select(o => o.Item1).ToList();
                         List<string> ConfigSetting_Tag = ConfigSetting_NormalTag.Concat(ConfigSetting_CalcTag).ToList();
+
 
                         ConcurrentDictionary<string, int> _DB_EDC_Labels = this._EDC_Label_Data.GetOrAdd(DB_info.device_id, new ConcurrentDictionary<string, int>());
                         List<string> DBSetting_Tag = _DB_EDC_Labels.Keys.ToList();
@@ -297,7 +327,9 @@ namespace DBService
 
             catch (Exception ex)
             {
-                _logger.LogError("First_Initial_DB_Information, error :" + ex.Message);
+                string ErrorLog = "First_Initial_DB_Information, error :" + ex.Message;
+                _logger.LogError(ErrorLog);
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0002", ErrorLog, "ERROR");
             }
 
         }
@@ -388,7 +420,9 @@ namespace DBService
 
             catch (Exception ex)
             {
-                _logger.LogError("Routine_Update_DB_Information, error :" + ex.Message);
+                string ErrorLog = "Routine_Update_DB_Information, error :" + ex.Message;
+                _logger.LogError(ErrorLog);
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0003", ErrorLog, "ERROR");
             }
 
         }
@@ -457,7 +491,10 @@ namespace DBService
             }
             catch (Exception ex)
             {
-                _logger.LogError(string.Format("DB Service Handle ReceiveMQTTData Exception Msg : {0}. ", ex.Message));
+                string ErrorLog = string.Format("DB Service Handle ReceiveMQTTData Exception Msg : {0}. ", ex.Message);
+                _logger.LogError(ErrorLog);
+                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0004", ErrorLog, "ERROR");
+
             }
 
         }
@@ -467,8 +504,11 @@ namespace DBService
             
             _logger.LogInformation(string.Format("Receive ReadData Event Topic : {0}, Msg : {1}. ", InputData.MQTTTopic, InputData.MQTTPayload));
             _logger.LogInformation("First Load DB Info Start");
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
             _First_Initial_DB_Information();
-            _logger.LogInformation("First Load DB Info Finished");
+            stopwatch.Stop();
+            _logger.LogInformation("First Load DB Info Finished Spect Time " + stopwatch.ElapsedMilliseconds + " ms");
             _Initial_Finished = true;
 
 
@@ -487,6 +527,45 @@ namespace DBService
             return isNum;
         }
         #endregion
+
+        public void ReportAlarm(string gateway_id, string device_id, string al_code, string al_desc, string al_level)
+        {
+            xmlMessage SendOutMsg = new xmlMessage();
+            SendOutMsg.GatewayID = gateway_id;     // GateID
+            SendOutMsg.DeviceID = device_id;   // DeviceID
+            SendOutMsg.MQTTTopic = "IOT_Alarm";
+
+            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new
+            {
+                AlarmCode = al_code,
+                Datetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"),
+                AlarmLevel = al_level,
+                AlarmApp = "IOTCLIENT",
+                AlarmDesc = al_desc
+
+            }, Formatting.Indented);
+            _QueueManager.PutMessage(SendOutMsg);
+        }
+
+
+
+        private void Load_Xml_Config_To_Dict(string config_path)
+        {
+            XElement SettingFromFile = XElement.Load(config_path);
+            XElement System_Setting = SettingFromFile.Element("system");
+
+            _dic_Basicsetting.Clear();
+
+            if (System_Setting != null)
+            {
+                foreach (var el in System_Setting.Elements())
+                {
+                    _dic_Basicsetting.Add(el.Name.LocalName, el.Value);
+                }
+            }
+        }
+
+
 
     }
 
