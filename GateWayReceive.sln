@@ -14,8 +14,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EDCService", "EDCService\ED
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DBService", "DBService\DBService.csproj", "{1FC23C55-8B26-4A56-B9FE-3853B732F020}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonitorService", "MonitorService\MonitorService.csproj", "{2EF6D79B-02E7-4275-B89A-E97D158EA1F5}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,10 +44,6 @@ Global
 		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1FC23C55-8B26-4A56-B9FE-3853B732F020}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2EF6D79B-02E7-4275-B89A-E97D158EA1F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2EF6D79B-02E7-4275-B89A-E97D158EA1F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2EF6D79B-02E7-4275-B89A-E97D158EA1F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2EF6D79B-02E7-4275-B89A-E97D158EA1F5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

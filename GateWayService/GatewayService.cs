@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -11,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using Kernel.Interface;
 using Kernel.Common;
 using Kernel.QueueManager;
+using System.Xml.Linq;
 using ObjectManager;
 
 namespace GatewayService
@@ -46,6 +48,15 @@ namespace GatewayService
 
         private ConcurrentDictionary<string, List<string>> _Wait_Function_Config_Reply = new ConcurrentDictionary<string, List<string>>();
 
+        private Dictionary<string, string> _dic_Basicsetting = new Dictionary<string, string>();
+
+        public string GateWayStatus = "Init";
+
+        private string _Version = "1.0.0";
+
+        private const string _GatewayID = "GatewayID";
+
+
         public GatewayService(ILoggerFactory loggerFactory,IServiceProvider serviceProvider)
         {
             _QueueManager = serviceProvider.GetService<IQueueManager>();
@@ -58,11 +69,20 @@ namespace GatewayService
             try
             {
                 _objectmanager = (ObjectManager.ObjectManager)_ObjectManager.GetInstance;
+
+                string Config_Path = AppContext.BaseDirectory + "/settings/System.xml";
+                Load_Xml_Config_To_Dict(Config_Path);
+
+
                 this._run = true;
                 this._th_Proc_Flow = new Thread(new ThreadStart(Proc_Flow));
                 this._th_Proc_Flow.Start();
-                _logger.LogTrace("EDC Service Initial Finished");
-                //Timer_Routine_Job(60000);  execute routine job 
+                _logger.LogTrace("GateWay Service Initial Finished");
+
+                GateWayStatus = "Init";
+
+
+                Timer_Routine_Job(_dic_Basicsetting["HeartBeat_Interval"]);  //execute routine job 
             }
             catch (Exception ex)
             {
@@ -77,16 +97,39 @@ namespace GatewayService
             _run = false;
         }
 
-        public bool ReadDateReady;
+        private void Load_Xml_Config_To_Dict(string config_path)
+        {
+            XElement SettingFromFile = XElement.Load(config_path);
+            XElement System_Setting = SettingFromFile.Element("system");
 
-       
+            _dic_Basicsetting.Clear();
+
+            if (System_Setting != null)
+            {
+                foreach (var el in System_Setting.Elements())
+                {
+                    _dic_Basicsetting.Add(el.Name.LocalName, el.Value);
+                }
+            }
+        }
 
 
         #region for Routine Job Used
-        private void Timer_Routine_Job(int interval)
+        private void Timer_Routine_Job(string interval)
         {
-            if (interval == 0)
-                interval = 10000;  // 10s
+            int reportInterval = 10000;
+            int temp = 0;
+
+            if (Int32.TryParse(interval, out temp))
+            {
+
+                reportInterval = temp * 1000;
+            }
+            else
+            {
+                reportInterval = 10000;
+            }
+
 
             System.Threading.Thread Thread_Timer_Report_EDC = new System.Threading.Thread
             (
@@ -96,12 +139,19 @@ namespace GatewayService
                    timer_routine_job = new System.Threading.Timer(new System.Threading.TimerCallback(Routine_TimerTask), null, 1000, Interval);
                }
             );
-            Thread_Timer_Report_EDC.Start(interval);
+            Thread_Timer_Report_EDC.Start(reportInterval);
         }
         private void Routine_TimerTask(object timerState)
         {
             try
             {
+                xmlMessage SendOutMsg = new xmlMessage();
+                SendOutMsg.GatewayID = _dic_Basicsetting[_GatewayID];     // GateID
+                SendOutMsg.DeviceID = _dic_Basicsetting[_GatewayID];
+                SendOutMsg.MQTTTopic = "HeartBeat";
+                SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Trace_ID = DateTime.Now.ToString("yyyyMMddHHmmssfff"),Status = GateWayStatus }, Formatting.Indented);
+                _QueueManager.PutMessage(SendOutMsg);
+                _logger.LogInformation("Report HeartBeat G/W Status = " + GateWayStatus);
 
             }
             catch (Exception ex)
@@ -118,7 +168,7 @@ namespace GatewayService
 
         public void ReceiveConfigEvent(xmlMessage InputData)
         {
-            ReadDateReady = false;
+            GateWayStatus = "Conf";
             // / IEW / gateway / device / Cmd / Config
             string[] Topic = InputData.MQTTTopic.Split('/');
             string GateWayID = Topic[2].ToString();
@@ -140,7 +190,7 @@ namespace GatewayService
                     foreach (string function in gateway.function_list)
                     {
                         xmlMessage SendOutMsg = new xmlMessage();
-                        SendOutMsg.LineID = GateWayID;     // GateID
+                        SendOutMsg.GatewayID = GateWayID;     // GateID
                         SendOutMsg.DeviceID = DeviceID;   // DeviceID
                         SendOutMsg.MQTTTopic = string.Concat(function, "_Config_Query");
                         SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Trace_ID = DateTime.Now.ToString("yyyyMMddHHmmssfff") }, Formatting.Indented);
@@ -163,11 +213,12 @@ namespace GatewayService
         public void SendConfigAckEvent(string GateWayID, string DeviceID, string _Cmd_Result)
         {
             xmlMessage SendOutMsg = new xmlMessage();
-            SendOutMsg.LineID = GateWayID;     // GateID
+            SendOutMsg.GatewayID = GateWayID;     // GateID
             SendOutMsg.DeviceID = DeviceID;   // DeviceID
             SendOutMsg.MQTTTopic = "Config_Ack";
             SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Cmd_Result = _Cmd_Result.ToString(), Trace_ID = DateTime.Now.ToString("yyyyMMddHHmmssfff") }, Formatting.Indented);
             _QueueManager.PutMessage(SendOutMsg);
+            GateWayStatus = "Ready";
 
         }
 
@@ -443,7 +494,7 @@ namespace GatewayService
 
                 //----- Send MQTT-----
                 xmlMessage SendOutMsg = new xmlMessage();
-                SendOutMsg.LineID = GateWayID;     // GateID
+                SendOutMsg.GatewayID = GateWayID;     // GateID
                 SendOutMsg.DeviceID = Device_ID;   // DeviceID
                 SendOutMsg.MQTTTopic = "EDCService";
                 SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(EDCReporter, Newtonsoft.Json.Formatting.Indented);
@@ -501,7 +552,7 @@ namespace GatewayService
 
                 //----- Send MQTT-----
                 xmlMessage SendOutMsg = new xmlMessage();
-                SendOutMsg.LineID = GateWayID;     // GateID
+                SendOutMsg.GatewayID = GateWayID;     // GateID
                 SendOutMsg.DeviceID = Device_ID;    // DeviceID
                 SendOutMsg.MQTTTopic = "DBService";
                 SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(DBReporter, Newtonsoft.Json.Formatting.Indented);
@@ -518,6 +569,9 @@ namespace GatewayService
 
         public void Receive_TEXOL_MQTT(xmlMessage InputData)
         {
+            if (GateWayStatus != "Run" && GateWayStatus != "Ready")
+                return;
+
             string receive_topic = InputData.MQTTTopic;
             if (_objectmanager.GatewayManager != null)
             {
@@ -545,6 +599,8 @@ namespace GatewayService
 
         public void ReceiveMQTTData(xmlMessage InputData)
         {
+            if (GateWayStatus != "Run" && GateWayStatus != "Ready")
+                return;
             // Parse Mqtt Topic
             string[] Topic = InputData.MQTTTopic.Split('/');    // /IEW/GateWay/Device/ReplyData
             string GateWayID = Topic[2].ToString();
@@ -580,8 +636,30 @@ namespace GatewayService
         public void ReceiveReadDataEvent(xmlMessage InputData)
         {
 
-            ReadDateReady = true;
-           
+            GateWayStatus = "Run";
+
+
+        }
+
+        public void ReceiveOTAEvent(xmlMessage InputData)
+        {
+            Process currentProcess = Process.GetCurrentProcess();
+            string pid = currentProcess.Id.ToString();
+
+            xmlMessage SendOutMsg = new xmlMessage();
+            SendOutMsg.GatewayID = _dic_Basicsetting[_GatewayID]; ;     // GateID
+            SendOutMsg.DeviceID = _dic_Basicsetting[_GatewayID]; ;   // DeviceID
+            SendOutMsg.MQTTTopic = "OTA_Ack";
+
+            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Version = _Version, Datetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"), Status = "OTA", ProcrssID = pid }, Formatting.Indented);
+            _QueueManager.PutMessage(SendOutMsg);
+
+            _logger.LogError("Gateway Services Handle OTA Process System Will be shutdown in 5 seconds.");
+
+            Thread.Sleep(5000);
+
+
+            System.Environment.Exit(System.Environment.ExitCode);
 
         }
     }

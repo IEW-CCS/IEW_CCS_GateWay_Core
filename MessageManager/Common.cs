@@ -13,7 +13,7 @@ namespace Kernel.Common
 
         private string _fromService;
         private string _deviceId;
-        private string _lineId;
+        private string _gatewayId;
         private DateTime _createTime;
 
         private string _mqtttopic;
@@ -22,15 +22,15 @@ namespace Kernel.Common
         private string _trxid;
 		private Dictionary<string, object> _useField;
 
-        public string LineID
+        public string GatewayID
         {
             get
             {
-                return this._lineId;
+                return this._gatewayId;
             }
             set
             {
-                this._lineId = value;
+                this._gatewayId = value;
             }
         }
 

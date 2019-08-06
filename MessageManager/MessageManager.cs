@@ -139,6 +139,11 @@ namespace Kernel.MessageManager
                         }
                     }
                 }
+                else
+                {
+
+                    throw new Exception("Message Dispatch Not Exist Key = " +  name);
+                }
                 return;
             }
             throw new Exception("Message Dispatch is Stop!");
