@@ -597,6 +597,37 @@ namespace GatewayService
             }
         }
 
+        public void Receive_IRSensor_MQTT(xmlMessage InputData)
+        {
+            if (GateWayStatus != "Run" && GateWayStatus != "Ready")
+                return;
+
+            string receive_topic = InputData.MQTTTopic;
+            if (_objectmanager.GatewayManager != null)
+            {
+                List<cls_Gateway_Info> Gateways = _objectmanager.GatewayManager.gateway_list.Where(p => p.virtual_flag == true).ToList();
+                if (Gateways.Count == 0)
+                    return;
+                else
+                {
+                    foreach (cls_Gateway_Info Gateway in Gateways)
+                    {
+                        try
+                        {
+                            Proc_IR_Temperature_DataXOL_Data Function = new Proc_IR_Temperature_DataXOL_Data(Gateway, _Update_ProcRecv_CollectData_Enqueue);
+                            ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError("Gateway Services Handle IRSensor Data Message Error :" + ex.Message);
+
+                        }
+                    }
+                }
+            }
+        }
+
+
         public void ReceiveMQTTData(xmlMessage InputData)
         {
             if (GateWayStatus != "Run" && GateWayStatus != "Ready")
