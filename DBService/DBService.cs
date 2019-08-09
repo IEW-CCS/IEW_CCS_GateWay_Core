@@ -96,7 +96,7 @@ namespace DBService
 
                 _Initial_Finished = false; // 等待IOT Client 與 CCS 完成通訊以後才開始動作
 
-                ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0000", "this is testing", "ERROR");
+                //ReportAlarm(_dic_Basicsetting[_GatewayID], _dic_Basicsetting[_DeviceID], "0000", "this is testing", "ERROR");
 
 
             }
