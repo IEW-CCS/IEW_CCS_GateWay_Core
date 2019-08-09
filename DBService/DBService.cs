@@ -263,6 +263,9 @@ namespace DBService
                     // "MS SQL" / "My SQL"  ""MS SQL"", "server= localhost;database=IoTDB;user=root;password=qQ123456")
                     using (var db = new DBContext.IOT_DbContext(DB_info.db_type, DB_info.connection_string))
                     {
+                        _logger.LogInformation(string.Format("Initial DB Context Object"));
+
+                        _logger.LogInformation(string.Format("Download IOT Device Object start"));
                         // 建置更新 IOT Device Information 
                         var _IOT_Status = db.IOT_DEVICE.AsQueryable().Where(p => p.gateway_id == DB_info.gateway_id && p.device_id == DB_info.device_id).ToList();
                         foreach (DBContext.IOT_DEVICE Device in _IOT_Status)
@@ -272,6 +275,9 @@ namespace DBService
                             this._IOT_Device.AddOrUpdate(_IOT_Device_key, _IOT_Device_Value, (key, oldvalue) => _IOT_Device_Value);
                         }
 
+                        _logger.LogInformation(string.Format("Download IOT Device Object end"));
+
+                        _logger.LogInformation(string.Format("Download IOT EDC Level Object start"));
                         // 建置更新 EDC Label to Local  (DB)
                         var vEDC_Label_Result = db.IOT_DEVICE_EDC_LABEL.AsQueryable().Where(o => o.device_id == DB_info.device_id).ToList();
                         _IOT_Device_key = string.Concat(DB_info.serial_id, "_", DB_info.gateway_id, "_", DB_info.device_id);
@@ -282,12 +288,14 @@ namespace DBService
                         }
                         this._EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sub_EDC_Labels, (key, oldvalue) => _Sub_EDC_Labels);
 
-                    
+                        _logger.LogInformation(string.Format("Download IOT EDC Level Object end"));
+
+                        _logger.LogInformation(string.Format("Upload IOT EDC Level Object start"));
+
                         // 建置 CCS Config 設定資料
                         List<string> ConfigSetting_NormalTag = DB_info.tag_info.Select(o => o.Item1).ToList();
                         List<string> ConfigSetting_CalcTag = DB_info.calc_tag_info.Select(o => o.Item1).ToList();
                         List<string> ConfigSetting_Tag = ConfigSetting_NormalTag.Concat(ConfigSetting_CalcTag).ToList();
-
 
                         ConcurrentDictionary<string, int> _DB_EDC_Labels = this._EDC_Label_Data.GetOrAdd(DB_info.device_id, new ConcurrentDictionary<string, int>());
                         List<string> DBSetting_Tag = _DB_EDC_Labels.Keys.ToList();
@@ -319,6 +327,8 @@ namespace DBService
                             this._EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _DB_EDC_Labels, (key, oldvalue) => _DB_EDC_Labels);
                             this._Sync_EDC_Label_Data.AddOrUpdate(_IOT_Device_key, _Sync_Device_EDC_Label, (key, oldvalue) => _Sync_Device_EDC_Label);
                         }
+
+                        _logger.LogInformation(string.Format("Upload IOT EDC Level Object end"));
 
                     }
 
