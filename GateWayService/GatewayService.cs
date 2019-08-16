@@ -674,6 +674,17 @@ namespace GatewayService
 
         public void ReceiveOTAEvent(xmlMessage InputData)
         {
+
+            JObject JsonOTA = JObject.Parse(InputData.MQTTPayload);
+            string _Trace_ID = JsonOTA["Trace_ID"].Value<string>();
+            string _Cmd = JsonOTA["Cmd"].Value<string>();
+
+            if(_Cmd != "OTA")
+            {
+                _logger.LogError("Gateway Services Handle OTA Process But Cmd type not is OTA so skip prorcessing.");
+                return;
+            }
+
             Process currentProcess = Process.GetCurrentProcess();
             string pid = currentProcess.Id.ToString();
 
@@ -682,13 +693,12 @@ namespace GatewayService
             SendOutMsg.DeviceID = _dic_Basicsetting[_GatewayID]; ;   // DeviceID
             SendOutMsg.MQTTTopic = "OTA_Ack";
 
-            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new { Version = _Version, Datetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"), Status = "OTA", ProcrssID = pid }, Formatting.Indented);
+            SendOutMsg.MQTTPayload = JsonConvert.SerializeObject(new {Trace_ID = _Trace_ID,  Version = _Version, Datetime = DateTime.Now.ToString("yyyyMMddHHmmssfff"), Status = "OTA", ProcrssID = pid }, Formatting.Indented);
             _QueueManager.PutMessage(SendOutMsg);
 
             _logger.LogError("Gateway Services Handle OTA Process System Will be shutdown in 5 seconds.");
 
             Thread.Sleep(5000);
-
 
             System.Environment.Exit(System.Environment.ExitCode);
 
