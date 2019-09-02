@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -38,6 +39,19 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
     <None Update="nlog.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -46,6 +60,6 @@
     </None>
   </ItemGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="call &quot;$(SolutionDIr)CopyConf.bat&quot; debug  &quot;$(SolutionDIr)\settings&quot; &quot;$(TargetDir)\settings&quot;" />
+    <Exec Command="call &quot;$(SolutionDIr)CopyConf.bat&quot; debug  &quot;$(SolutionDIr)\settings&quot; &quot;$(TargetDir)\settings&quot;&#xD;&#xA;call &quot;$(SolutionDIr)\VersionInfo\GetVersion.exe&quot; $(TargetPath) &quot;IOT_Client&quot;  $(TargetDir)\version\IOT_Client.Version" />
   </Target>
 </Project>
