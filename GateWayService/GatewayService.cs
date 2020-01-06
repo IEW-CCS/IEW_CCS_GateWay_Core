@@ -627,9 +627,10 @@ namespace GatewayService
             }
         }
 
-
+        // Chris Modify 20191023 直接在外面判斷是否為virtual type
         public void ReceiveMQTTData(xmlMessage InputData)
         {
+            
             if (GateWayStatus != "Run" && GateWayStatus != "Ready")
                 return;
             // Parse Mqtt Topic
@@ -648,16 +649,28 @@ namespace GatewayService
                     cls_Device_Info Device = Gateway.device_info.Where(p => p.device_name == DeviceID).FirstOrDefault();
                     if (Device != null)
                     {
-                        try
-                        {
-                             ProcCollectData Function = new ProcCollectData(Device, GateWayID, DeviceID, _Update_ProcRecv_CollectData_Enqueue);
-                             ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc(InputData.MQTTPayload.ToString()));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError("Gateway Services Handle Receive MQTT Message Error :" + ex.Message);
-                           
-                        }
+
+
+                            try
+                            {
+                                ProcCollectData Function = new ProcCollectData(Device, GateWayID, DeviceID, _Update_ProcRecv_CollectData_Enqueue);
+
+                                if (Gateway.virtual_flag == false)
+                                {
+                                    ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc_Physical(InputData.MQTTPayload.ToString()));
+                                }
+                                else
+                                {
+                                    ThreadPool.QueueUserWorkItem(o => Function.ThreadPool_Proc_Virtual(InputData.MQTTPayload.ToString()));
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError("Gateway Services Handle Receive MQTT Message Error :" + ex.Message);
+
+                            }
+                    
+                       
                     }
                 }
             }

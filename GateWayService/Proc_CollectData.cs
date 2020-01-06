@@ -28,7 +28,7 @@ namespace GatewayService
             this.Put_ProcRecv_CollectData = _delegate_Method;
 
         }
-        public void ThreadPool_Proc(string msg)
+        public void ThreadPool_Proc_Physical(string msg)
         {
             try
             {
@@ -107,6 +107,35 @@ namespace GatewayService
                             ProcRecv_CollectData.Prod_EDC_Data.Enqueue(Tuple.Create(p.DATA_NAME, Output));
                         }
 
+                    });
+                }
+
+                this.Put_ProcRecv_CollectData(ProcRecv_CollectData);
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(string.Format("Handle ProcCollectData Message Error [{0}].", ex.Message));
+            }
+        }
+
+        public void ThreadPool_Proc_Virtual(string msg)
+        {
+            try
+            {
+                cls_read_data_reply CollectData = null;
+                CollectData = JsonConvert.DeserializeObject<cls_read_data_reply>(msg.ToString());
+
+                cls_ProcRecv_CollectData ProcRecv_CollectData = new cls_ProcRecv_CollectData();
+                ProcRecv_CollectData.GateWayID = _GatewayID;
+                ProcRecv_CollectData.Device_ID = _DeviceID;
+
+                if (CollectData != null)
+                {
+                    // 直接平行處理對應所有Tag
+                    Parallel.ForEach(CollectData.EDC_Data, p =>
+                    {
+                       ProcRecv_CollectData.Prod_EDC_Data.Enqueue(Tuple.Create(p.DATA_NAME, p.DATA_VALUE));
                     });
                 }
 
