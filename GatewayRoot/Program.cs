@@ -64,6 +64,10 @@ namespace Dotnet_JOB_Client
                 //如果要做到跨Session唯一，名稱可加入"Global\"前綴字
                 //如此即使用多個帳號透過Terminal Service登入系統
                 //整台機器也只能執行一份
+
+                Console.WriteLine("Version: {0}", Assembly.GetExecutingAssembly().GetName().Version.ToString());
+
+
                 using (Mutex m = new Mutex(false, "Global\\" + appGuid))
                 {
                     //檢查是否同名Mutex已存在(表示另一份程式正在執行)
